@@ -35,14 +35,27 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
    - A service script run without its args prompts for them with defaults (the only postgres container, the next free IP).
    - Destructive commands (delete instance, restore db) always ask for confirmation.
    - Existing flags and args keep working without prompts, so cron and scripted use still work.
-3. **Multiple hostnames** (design agreed with user, not built). Instances stay on a path
-   (`https://<host>/<instance>`), but each instance chooses its host, and hosts can be shared:
-   `hmis.example.com/hmis`, `hmis.example.com/training`, `hmis2.example.com/hmis2`.
-   - `fqdn` in `containers.json` is the default host. Record each instance's host with `lxc config set <name> user.dhis2.hostname`.
-   - `dhis2-create-instance` asks for the host: pick one already in use, or enter a new one.
-   - A new host gets its own nginx server block / apache VirtualHost and its own Let's Encrypt certificate.
-     Check that its DNS resolves to this server before calling certbot (failed requests risk rate limits).
-   - Existing instances (upstream files directly in `/etc/nginx/upstream` or `/etc/apache2/upstream`) must keep working as `fqdn`'s.
+3. **Hostnames and paths** (final design agreed with user 2026-09-25, not built).
+   An instance's address is `https://<hostname>/<path>`. The container name is separate.
+   - Hostnames: the `fqdn` from `containers.json`, plus any number of **subdomains of the fqdn only**.
+   - Path: unique **within a hostname**, so `hmis.example.com/hmis` and `hmis2.example.com/hmis` can both exist.
+     Allowed characters: `[a-z0-9_-]`. `/munin` is reserved on the fqdn, and so is `/<other path>-glowroot`. No instance at the root `/`.
+   - Container name defaults to `<subdomain>-<path>` (`hmis2.example.com/hmis` → `hmis2-hmis`), and the user can override it.
+     It is also the database name and role, so scripts must quote it in SQL (`-` is not valid unquoted).
+   - Stored on the container: `user.dhis2.hostname`, `user.dhis2.path`.
+   - Tomcat context = path (war unzipped to `webapps/<path>`), so the proxy never rewrites paths. Glowroot is at `/<path>-glowroot`.
+   - `dhis2-create-instance` prompts:
+     1. Pick a hostname (the menu shows each hostname's paths) or enter a new subdomain.
+     2. Path.
+     3. Container name [generated].
+     Non-interactive: `-H <hostname> -p <path> [name]`.
+   - New subdomain: check that DNS resolves to this server. On failure, stop, explain what to check, and offer to retry.
+     Then create its nginx server block / apache VirtualHost and its own certificate, asking about auto-renewal.
+   - The hostname root (`https://<hostname>/`) always shows a list of links to its instances.
+   - Deleting the last instance on a subdomain asks whether to remove the subdomain's proxy config and certificate. Never removes the fqdn.
+   - `dhis2-move-instance <name> <hostname> [path]` moves an instance to another hostname and/or path.
+   - `dhis2-list-instances` shows name, address, version, status.
+   - Existing instances: the upgrade script labels them hostname=fqdn, path=container name. No renames.
 4. **Upgrade path for existing servers.** `setup/upgrade_setup.sh` repairs hosts installed with the
    old scripts. Every fix that changes installed state needs a matching step there.
 
