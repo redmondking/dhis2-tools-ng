@@ -1,0 +1,173 @@
+# Tasks
+
+Design and decisions are in `CLAUDE.md`. This file tracks the work.
+Phases are roughly in order: each phase builds on the ones before it.
+
+Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
+
+## Phase 0 – Bug fixes (branch `fix/bugs`)
+
+- [~] 0.1 `dhis2-create-instance`: `-n` ignored, `JAVA_HOME` rendered as `java-{{ 17 }}-...`, gawk-only free-IP pick, prefix-matching name checks
+- [~] 0.2 `ssl_setup.sh`: renewal cron written to the host. Now uses certbot's own timer, with a prompt for auto-renewal
+- [~] 0.3 `dhis2-delete-instance`: required 2 args, broke `/etc/hosts`, no confirmation
+- [~] 0.4 `dhis2-restoredb`: no argument checks, no confirmation
+- [~] 0.5 sysctl typo, appended on every run and never applied
+- [~] 0.6 NAT network hardcoded to `192.168.0.0/24`
+- [~] 0.7 rsyslog logger: wrong subnet, broken config, apt prompt
+- [~] 0.8 `upgrade_setup.sh`: repairs servers installed with the old scripts
+
+## Phase 1 – Test what's done
+
+- [ ] 1.1 Test server: fresh Ubuntu 24.04 VM, ~8 GB RAM, that can be wiped (see Q1)
+- [ ] 1.2 Install with the **original** scripts (`a37e7db`) and create an instance with glowroot, then run `upgrade_setup.sh` and check every step
+- [ ] 1.3 Fresh install from `fix/bugs`, then check each fix:
+  - `-n`
+  - `JAVA_HOME`
+  - free-IP pick with a stopped container
+  - `certbot renew --dry-run`
+  - delete instance
+  - restore database
+  - `sysctl` values
+  - `iptables -t nat -S`
+  - rsyslog
+- [ ] 1.4 Merge `fix/bugs` into `master` and push
+
+## Phase 2 – Modernise the base
+
+- [ ] 2.1 Proxy, postgres and monitor containers on Ubuntu 24.04 (`create_containers.sh`, `change_webserver.sh`)
+- [ ] 2.2 `postgres` type: PostgreSQL 16 + `postgis-3` using a keyring. Delete `postgres12` and `postgres12_postsetup`
+- [ ] 2.3 Replace `apt-key` with `/etc/apt/keyrings` + `signed-by` (postgres, nginx)
+- [ ] 2.4 Tomcat per instance: `tomcat9` on 22.04 or `tomcat10` on 24.04, stored as `user.dhis2.tomcat`.
+      Remove the hardcoded `tomcat9` from:
+  - `etc/tomcat_setup`
+  - `etc/tomcat_default`
+  - `dhis2-create-instance`
+  - `dhis2-deploy-war`
+  - `dhis2-logview`
+  - `dhis2-tomcat-munin`
+- [ ] 2.5 Check that DHIS2 2.38 runs on PostgreSQL 16. If not, support a second postgres container on 14
+- [ ] 2.6 Proxy configs:
+  - remove OCSP stapling
+  - `http2 on;`
+  - drop `X-XSS-Protection`
+- [ ] 2.7 Glowroot: one version setting instead of two hardcoded ones
+- [ ] 2.8 `chown root.root` → `root:root`, `tomcat.tomcat` → `tomcat:tomcat`
+- [ ] 2.9 Delete `setup/.DS_Store`, `configs/containers.json.exampleused`, `setup/destroy`
+
+## Phase 3 – Multiple DHIS2 versions
+
+- [ ] 3.1 Shared helpers for the service scripts:
+  - read the release feed
+  - prompts with defaults (`ask`, `menu`, `confirm`)
+  - read and write the `user.dhis2.*` labels
+- [ ] 3.2 Version menu from the feed: versions ≥ 2.38, then the patch release (default: latest)
+- [ ] 3.3 Choose Ubuntu, Tomcat and JDK from the version
+- [ ] 3.4 Download the war, check its sha256, deploy it to `webapps/<path>`
+- [ ] 3.5 Record `user.dhis2.version` and `user.dhis2.tomcat` on the container
+- [ ] 3.6 `dhis2-deploy-war`: patch updates within the same version, with a sha256 check. For a different version, point to the upgrade script (phase 9)
+- [ ] 3.7 `dhis2-list-instances`: name, address, version, status
+
+## Phase 4 – Hostnames and paths
+
+- [ ] 4.1 Proxy layout with one server block / VirtualHost per hostname. Existing upstream files keep working under the fqdn (see Q3)
+- [ ] 4.2 Page at each hostname root that lists its instances, regenerated whenever instances change
+- [ ] 4.3 DNS check for a new subdomain: on failure, explain what to check and offer to retry
+- [ ] 4.4 Certificate per subdomain, with the auto-renewal prompt
+- [ ] 4.5 `dhis2-create-instance` prompts:
+  1. hostname (existing or new subdomain)
+  2. path, validated
+  3. container name [`<subdomain>-<path>`]
+
+  Flags: `-H`, `-p`
+- [ ] 4.6 Quote instance names in all SQL, since names can contain `-`
+- [ ] 4.7 `dhis2-delete-instance`: remove the instance from its hostname. If it was the last one there, offer to remove the subdomain (never the fqdn)
+- [ ] 4.8 `dhis2-move-instance <name> <hostname> [path]`
+- [ ] 4.9 Glowroot at `/<path>-glowroot`
+
+## Phase 5 – Interactive setup and instance creation
+
+- [ ] 5.1 Setup wizard: asks FQDN, email, TZ, proxy, monitoring, APM, then writes `containers.json`
+- [ ] 5.2 Service scripts prompt for missing arguments when run in a terminal:
+  - `dhis2-deploy-war`
+  - `dhis2-logview`
+  - `dhis2-restoredb`
+  - `dhis2-dbactivity`
+  - `dhis2-delete-instance`
+- [ ] 5.3 Admin login on a new instance:
+  - Ask for the username [`admin`] and password [`district`].
+  - If both are left as defaults, change nothing, but print a warning that the default login is publicly known.
+  - If either differs, wait until DHIS2 is up and change it through the API.
+  - Skip this step when the instance was restored from a backup.
+- [ ] 5.4 Memory for the instance (Java heap + container limit), default based on free RAM (see Q8)
+
+## Phase 6 – Backups
+
+- [ ] 6.1 Setup wizard asks for the backup settings, each with a default. They are written to `dhis2-env` and the cron job is enabled.
+  - time
+  - daily backups to keep (7)
+  - weekly backups to keep (3, Sunday)
+  - monthly backups to keep (12, the 1st)
+  - backup directory
+  - optional remote rsync target
+- [ ] 6.2 `dhis2-backup`: delete old monthly backups, use each database's own container, quote names
+- [ ] 6.3 `dhis2-create-instance`: "Back up this instance? [Y/n]" adds it to `PLAIN_BACKUPS`. `dhis2-delete-instance` removes it
+
+## Phase 7 – Create an instance from a backup
+
+- [ ] 7.1 `dhis2-create-instance` asks "Restore from a backup? [y/N]":
+  - Ask for the backup file and check that it exists and is valid gzip.
+  - Ask "Which DHIS2 version is this backup from?" using the version menu.
+  - Backups older than 2.38 are refused with an explanation.
+- [ ] 7.2 Restore into the new database **before** DHIS2 first starts, deploying the war for that version (reuses `dhis2-restoredb -y`)
+- [ ] 7.3 Skip the admin login step (5.3), since the backup brings its own users
+- [ ] 7.4 Encrypted backups (`.sql.gz.enc`) and the DHIS2 file store (see Q12, Q13)
+
+## Phase 8 – Bring existing servers forward (`upgrade_setup.sh`)
+
+- [ ] 8.1 Label existing instances:
+  - `hostname` = fqdn
+  - `path` = container name
+  - `version` = read from the deployed war
+  - `tomcat` = `tomcat9`
+- [ ] 8.2 Move proxy config to the per-hostname layout
+- [ ] 8.3 `containers.json` type `postgres12` → `postgres`
+- [ ] 8.4 Optional PostgreSQL 13 → 16 upgrade, with a checked backup first (see Q7)
+- [ ] 8.5 Keep existing `dhis2-env` backup settings, only adding new keys
+
+## Phase 9 – DHIS2 version upgrade script (last)
+
+- [ ] 9.1 Design first. Things to handle:
+  - allowed upgrade steps (one version at a time?)
+  - backup of the database and the file store before starting, plus a rollback plan
+  - Java change
+  - **2.41 → 2.42 crosses Tomcat 9 / 22.04 → Tomcat 10 / 24.04.** This needs a new container, carrying over:
+    - `dhis.conf`
+    - `/opt/dhis2` (file store)
+    - glowroot
+    - IP
+    - proxy entry
+    - labels
+  - follow database migrations in the log, and check health after start
+  - app compatibility and analytics tables
+  - downtime warning and confirmation
+- [ ] 9.2 Build `dhis2-upgrade-instance`
+
+## Phase 10 – Docs and polish
+
+- [ ] 10.1 Rewrite `README.md` and `docs/`, which describe Ubuntu 18.04, PostgreSQL 10 and a 2.33 war
+- [ ] 10.2 Switch prompts to `whiptail` once everything above is tested
+
+## Open questions
+
+Suggested answers in brackets. Not decided yet.
+
+- Q1 Test server available? [fresh 24.04 VM, 8 GB]
+- Q2 Host Ubuntu versions? [24.04 for new installs; `upgrade_setup.sh` also on 20.04/22.04 hosts]
+- Q3 Keep both nginx and apache? [nginx only for new features; existing apache servers keep working]
+- Q4 Contribute back to `bobjolliffe/dhis2-tools-ng`, or keep it as your own fork? [own fork]
+- Q6 One shared PostgreSQL 16 container? [yes, pending 2.5]
+- Q7 Offer PostgreSQL 13 → 16 upgrade on existing servers? [yes, optional, backup first]
+- Q8 Ask for memory per instance? [yes, default from free RAM]
+- Q11 Munin and Glowroot as yes/no in the wizard? [yes]
+- Q12 Restore encrypted backups? [yes, ask for the password file]
+- Q13 Back up the DHIS2 file store (`/opt/dhis2/files`: uploaded documents, images) as well as the database? [yes, it isn't in the database dump]

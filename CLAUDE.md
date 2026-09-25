@@ -26,7 +26,7 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
    `name`, `supported`, `jdk`, `latestStableUrl`, `sha256`, `patchVersions`.
    - Instance creation shows supported versions as a menu, installs the JDK the feed lists, downloads the war and checks its sha256.
    - Record the version on the container with `lxc config set <name> user.dhis2.version`.
-   - `dhis2-deploy-war` doubles as the upgrade path. It switches the JDK and `JAVA_HOME` when the new version needs a different one.
+   - `dhis2-deploy-war` handles patch updates within a version (2.41.9 → 2.41.10). Changing version is the upgrade script's job (goal 9).
    - Add a small `dhis2-list-instances` showing name, version, Java, IP and status.
    - JDK per version, from the feed on 2026-09-25: 2.41–2.43 → 17, 2.38–2.40 → 11, 2.37 → 8.
 2. **Interactive.** Use plain bash for now (`read -p`, `select`).
@@ -60,8 +60,11 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
    Offer only versions from the feed with `name >= 2.38`.
    - Database: one shared PostgreSQL 16 container. The DHIS2 docs require ≥9.6 for 2.38/2.39 and recommend 14,
      but say nothing about 16. **Test 2.38 on PG16.** If it fails, allow a second postgres container on 14 for old versions.
-5. **Admin password.** After the first war deploy, once DHIS2 is up, ask for a new password for the default `admin` / `district`
-   account, offering a generated strong password as the default.
+5. **Admin login.** `dhis2-create-instance` asks for the admin username [`admin`] and password [`district`].
+   - Pressing Enter keeps DHIS2's defaults.
+   - The change-credentials step runs only if either value differs from the default: wait for DHIS2 to be up, then change it via the API.
+   - Keeping the defaults prints a warning, since `admin`/`district` is publicly known.
+   - Skipped when the instance was created from a backup, which brings its own users.
 6. **Backups.**
    - The install/setup wizard asks for the backup settings, each with a default:
      - time of the nightly run (`/etc/cron.d/dhis`)
@@ -76,6 +79,11 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
    - `dhis2-backup` hardcodes the `postgres` container. Use each database's own container once there can be more than one.
 7. **Upgrade path for existing servers.** `setup/upgrade_setup.sh` repairs hosts installed with the
    old scripts. Every fix that changes installed state needs a matching step there.
+8. **Create an instance from a backup.** `dhis2-create-instance` asks whether there is a backup to restore, and which DHIS2 version it is from.
+   - It restores the backup before DHIS2 first starts, then deploys that version's war.
+   - Versions older than 2.38 are refused.
+9. **DHIS2 version upgrade script** (`dhis2-upgrade-instance`). To be built **last**, because it has many variables (see tasks.md phase 9).
+   In particular, 2.41 → 2.42 moves from a Tomcat 9 / 22.04 container to a Tomcat 10 / 24.04 one.
 
 ## Servlet container per DHIS2 version
 
@@ -89,35 +97,9 @@ The official Ubuntu guide (docs.dhis2.org manual-install-on-ubuntu) and a check 
 Decision (user, 2026-09-25): proxy, postgres and monitor containers, and instances of DHIS2 2.42+, use Ubuntu **24.04** with `tomcat10`.
 Instances of DHIS2 ≤2.41 use a **22.04** container with `tomcat9`, as the official DHIS2 guide does (22.04 standard support ends April 2027).
 
-## Roadmap
+## Tasks
 
-### 1. Bug fixes (done on `fix/bugs`, not yet tested on a real host)
-- [x] `service/dhis2-create-instance`: `if [ $CREATEDB ]` is always true, so `-n` is ignored.
-- [x] `service/dhis2-create-instance` + `etc/tomcat_default`: the template has `{{ JAVA_VERSION }}` but sed replaces only `JAVA_VERSION`, giving `java-{{ 17 }}-...`. The non-glowroot branch substitutes nothing. The path hardcodes `amd64`.
-- [x] `service/dhis2-create-instance`: free-IP detection uses gawk-only `strtonum`, but Ubuntu's default awk is mawk.
-- [x] `ssl_setup.sh`: the renewal cron `lxc exec proxy -- echo ... > /etc/cron.d/certbot` writes to the **host**, with a stray trailing `/`. Renewal likely never works.
-- [x] `service/dhis2-delete-instance`: requires 2 args despite a postgres default. The `/etc/hosts` sed uses undefined `$N`, so it deletes any line ending in a space. No confirmation before dropdb.
-- [x] `service/dhis2-restoredb`: no argument validation, and `usage` is never called.
-- [x] `configs/sysctl`: typo `max_user_watchesi`. `lxd_setup.sh` appends it on every run and never applies it (`sysctl --system`).
-- [x] `create_containers.sh`: NAT network hardcoded to `192.168.0.0/24` (`# FIX THIS`).
-- [x] `containers/rsyslog_logger*`: wrong subnet `192.168.25.0/24`, `sed '$ a'` lines missing a file argument, `apt upgrade` without `-y`.
-
-### 2. Modernise
-- [ ] Guest OS 20.04 (EOL) → 24.04, except DHIS2 ≤2.41 instances on 22.04 (see table above).
-      Scripts hardcode `tomcat9` (service name, `/var/lib/tomcat9`, `/etc/default/tomcat9`), so these become per instance.
-- [ ] PostgreSQL 13 (EOL Nov 2025) and `postgres12` → a single `postgres` type with PostgreSQL 16 and `postgis-3`.
-      `postgresql-13-postgis-2.5` doesn't exist on 24.04.
-- [ ] Replace `apt-key` with `/etc/apt/keyrings/*.asc` and `signed-by=`.
-- [ ] Java choice: derive from the release feed instead of `-j 8|11|17` with default 11.
-- [ ] Glowroot: stop hardcoding 0.13.6 and 0.14.2.
-- [ ] Proxy: remove OCSP stapling (Let's Encrypt shut down OCSP in 2025), use `http2 on;` instead of `listen ... http2`, drop `X-XSS-Protection`.
-- [ ] Docs: they still describe Ubuntu 18.04, PostgreSQL 10 and a 2.33 war URL.
-- [ ] Remove `setup/.DS_Store`, `configs/containers.json.exampleused`, `setup/destroy`.
-- [x] `ssl_setup.sh` asks whether to renew automatically (enables/disables certbot's systemd timer).
-- [x] `setup/upgrade_setup.sh` for servers installed with the old scripts.
-
-### 3. Multi-version support (see Goals)
-### 4. Interactive prompts and setup wizard (see Goals)
+Tracked in `tasks.md`, which also lists the open questions. Update it as work is done: `[~]` means done but not tested on a real server.
 
 ## Conventions
 
