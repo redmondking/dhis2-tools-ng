@@ -147,7 +147,8 @@ Tracked in `tasks.md`, which also lists the open questions. Update it as work is
 ## Workflow
 
 - **Before starting any task:** discuss all its features and requirements with the user and agree on them.
-  Then write a plan and get it approved. Only then implement.
+  Then create the plan **in plan mode** (EnterPlanMode, then present it with ExitPlanMode) and get it approved. Only then implement.
+  Whenever the user says "create a plan", that means plan mode.
 - Work on the `develop` branch. `master` stays at the original code (`a37e7db`) until testing passes, then `develop` is merged into it.
 - Commit messages must not mention Claude or carry Claude attribution.
 
