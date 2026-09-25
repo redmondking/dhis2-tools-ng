@@ -96,6 +96,32 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
 9. **DHIS2 version upgrade script** (`dhis2-upgrade-instance`). To be built **last**, because it has many variables (see tasks.md phase 9).
    In particular, 2.41 → 2.42 moves from a Tomcat 9 / 22.04 container to a Tomcat 10 / 24.04 one.
 
+## Monitoring (agreed 2026-09-25)
+
+Security problem being fixed: today Glowroot gives `anonymous` the Administrator role and every `https://<fqdn>/<instance>-glowroot`
+is public, which exposes SQL, thread dumps and heap dumps. `/munin` is public too.
+Do this early (phase 2), plus `upgrade_setup.sh` steps for running servers.
+
+- **Munin**: optional, asked once in the setup wizard.
+  - No: no `monitor` container and no munin-node anywhere.
+  - Yes: `monitor` container; the host, proxy and postgres are monitored.
+  - Login: nginx basic auth on `/munin`, one server-wide login. The password hash (`openssl passwd -6`) lives on the proxy.
+    Change it with `dhis2-munin-login`.
+- **Glowroot**: a Java agent inside each instance's Tomcat (port 4000, published as `/<path>-glowroot`), not a container.
+  - Uses Glowroot's **own** login: `admin.json` users with `passwordHash` = PBKDF2-HMAC-SHA1, 16-byte key, 16-byte salt,
+    500000 iterations, formatted `b64(hash):b64(salt):500000` (unpadded base64). The iteration count must be exactly 500000.
+    Generate it with host python3, passing the password on stdin. Remove the `anonymous` user.
+  - The wizard asks whether Glowroot is on by default for new instances, and the login mode:
+    **shared** (one login for all instances; hash kept in `/usr/local/etc/dhis/glowroot-login`, root only) or **own** (asked per instance).
+  - `dhis2-create-instance` asks "Install Glowroot on this instance?" and, in own mode, for the login.
+    It also asks "Monitor this instance with Munin?" when Munin is installed (this absorbs `dhis2-tomcat-munin`).
+  - `dhis2-glowroot-login [instance]`: no argument changes the shared login everywhere; with an instance, it sets that instance's own login.
+    Glowroot reads logins only at startup, so the command asks before restarting.
+  - Stored on the container as `user.dhis2.glowroot` = `shared|own|off`.
+- Munin and Glowroot logins are always separate.
+- Passwords: the user always types them (twice). No defaults, nothing generated, empty passwords refused.
+- Later: turning Glowroot or Munin on or off for an existing instance.
+
 ## Servlet container per DHIS2 version
 
 The official Ubuntu guide (docs.dhis2.org manual-install-on-ubuntu) and a check of the war files on 2026-09-25 agree:
