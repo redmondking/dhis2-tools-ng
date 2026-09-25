@@ -76,6 +76,8 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
      These are written to `/usr/local/etc/dhis/dhis2-env` and the cron job is enabled.
    - `dhis2-create-instance` asks "Back up this instance? [Y/n]" and adds its database to `PLAIN_BACKUPS`.
      `dhis2-delete-instance` removes it.
+   - Layout: grouped by instance, then by date: `BACKUP_DIR/<instance>/<date>-<daily|weekly|monthly>/` holding
+     `<instance>.sql.gz[.enc]` and `<instance>.files.tar.gz[.enc]`.
    - `dhis2-backup` also archives each instance's `/opt/dhis2/files` (the DHIS2 file store, which is not in the database dump),
      encrypted when its database is.
    - `dhis2-backup` hardcodes the `postgres` container. Use each database's own container once there can be more than one.

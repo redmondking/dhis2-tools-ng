@@ -111,15 +111,32 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
   - optional remote rsync target
 - [ ] 6.2 `dhis2-backup`: delete old monthly backups, use each database's own container, quote names
 - [ ] 6.3 `dhis2-create-instance`: "Back up this instance? [Y/n]" adds it to `PLAIN_BACKUPS`. `dhis2-delete-instance` removes it
-- [ ] 6.4 `dhis2-backup` also backs up each instance's file store:
-  - `/opt/dhis2/files` → `<name>.files.tar.gz`, next to `<name>.sql.gz` in the same backup folder
+- [ ] 6.4 New layout: group by instance, then by date. Each run is one folder holding the database and the file store:
+  ```
+  /var/pgbackups/
+    hmis-hmis/
+      20260925_202500-daily/
+        hmis-hmis.sql.gz
+        hmis-hmis.files.tar.gz
+      20260927_202500-weekly/
+      20261001_202500-monthly/
+    hmis2-hmis/
+      20260925_202500-daily/
+        hmis2-hmis.sql.gz.enc
+        hmis2-hmis.files.tar.gz.enc
+  ```
+  - Retention (daily/weekly/monthly) is applied inside each instance's folder.
+  - Files keep the instance name, so a copied-out file still says what it is.
+- [ ] 6.5 `dhis2-backup` also backs up each instance's file store:
+  - `/opt/dhis2/files` → `<name>.files.tar.gz`, next to `<name>.sql.gz` in the same run folder
   - Taken from the instance container of the same name. If no such container exists, skip it with a note.
   - Encrypted the same way as its database (`.files.tar.gz.enc`) when the instance is in `ENCRYPTED_BACKUPS`.
 
 ## Phase 7 – Create an instance from a backup
 
 - [ ] 7.1 `dhis2-create-instance` asks "Restore from a backup? [y/N]":
-  - Ask for the backup file and check that it exists and is valid gzip.
+  - Offer a menu of the backups found in `BACKUP_DIR` (instance, date, type, size), or let the user give another file path.
+  - Check that the file exists and is valid gzip.
   - Ask "Which DHIS2 version is this backup from?" using the version menu.
   - Backups older than 2.38 are refused with an explanation.
 - [ ] 7.2 Restore into the new database **before** DHIS2 first starts, deploying the war for that version (reuses `dhis2-restoredb -y`)
@@ -138,6 +155,8 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 - [ ] 8.3 `containers.json` type `postgres12` → `postgres`
 - [ ] 8.4 Optional PostgreSQL 13 → 16 upgrade, with a checked backup first (see Q7)
 - [ ] 8.5 Keep existing `dhis2-env` backup settings, only adding new keys
+- [ ] 8.6 Move existing backups into the new layout: `backup<date>-<type>/<db>.sql.gz*` → `<db>/<date>-<type>/`.
+      Tell the user the remote copy will receive the new layout, and that the old remote folders are left for them to remove.
 
 ## Phase 9 – DHIS2 version upgrade script (last)
 
