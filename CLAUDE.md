@@ -112,6 +112,13 @@ Instances of DHIS2 ≤2.41 use a **22.04** container with `tomcat9`, as the offi
 
 Tracked in `tasks.md`, which also lists the open questions. Update it as work is done: `[~]` means done but not tested on a real server.
 
+## Workflow
+
+- **Before starting any task:** discuss all its features and requirements with the user and agree on them.
+  Then write a plan and get it approved. Only then implement.
+- Work on the `develop` branch. `master` stays at the original code (`a37e7db`) until testing passes, then `develop` is merged into it.
+- Commit messages must not mention Claude or carry Claude attribution.
+
 ## Conventions
 
 - Keep scripts plain bash, matching the existing style (`lxc exec $NAME -- ...`, heredocs for config files).
