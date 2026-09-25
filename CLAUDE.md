@@ -122,6 +122,12 @@ Do this early (phase 2), plus `upgrade_setup.sh` steps for running servers.
 - Passwords: the user always types them (twice). No defaults, nothing generated, empty passwords refused.
 - Later: turning Glowroot or Munin on or off for an existing instance.
 
+## Packages (agreed)
+
+- Use Ubuntu 24.04's own packages: `postgresql-16` + `postgresql-16-postgis-3`, `nginx` (1.24), `certbot` (apt, not snap). No third-party apt repositories.
+- nginx 1.24 does not support `http2 on;`, so keep `listen 443 ssl http2;`.
+- Existing servers keep their containers (20.04, PostgreSQL 13) until phase 8, which moves them to 24.04 and PostgreSQL 16 in one step.
+
 ## Servlet container per DHIS2 version
 
 The official Ubuntu guide (docs.dhis2.org manual-install-on-ubuntu) and a check of the war files on 2026-09-25 agree:
@@ -144,6 +150,26 @@ Tracked in `tasks.md`, which also lists the open questions. Update it as work is
   Then write a plan and get it approved. Only then implement.
 - Work on the `develop` branch. `master` stays at the original code (`a37e7db`) until testing passes, then `develop` is merged into it.
 - Commit messages must not mention Claude or carry Claude attribution.
+
+## Future management system
+
+The user will later build a Nuxt web app to manage servers: deploy instances on existing servers, manage backups, and so on.
+It will drive these scripts, probably over `ssh <server> sudo <command>`. So every script must be automatable:
+
+- Every input has a flag. Prompts appear only when a value is missing **and** stdin is a TTY.
+- When stdin is not a TTY and a required value is missing, exit non-zero naming the missing flag. Never hang waiting for input.
+- Secrets never go in argv (visible in `ps`). Read them from stdin, e.g. `--password-stdin`, like `docker login`.
+- Destructive actions take `-y` to skip confirmation.
+- Exit code 0 on success, non-zero on failure. Errors go to stderr.
+- List and status commands get a `--json` output as they are built (`dhis2-list-instances`, backups, remotes).
+- All state lives on the server: container labels `user.dhis2.*` and files in `/usr/local/etc/dhis`. Nothing is kept only in the tool's memory.
+- Re-running a command should be safe (check before changing).
+
+## Install
+
+- Option A (agreed): installs go through the setup wizard. No unattended installs for now.
+- `containers.json.sample` stays until the wizard exists (phase 5), then is deleted.
+- Later, possibly: the wizard saves its answers (no passwords) so `setup.sh --answers <file>` can replay them.
 
 ## Conventions
 
