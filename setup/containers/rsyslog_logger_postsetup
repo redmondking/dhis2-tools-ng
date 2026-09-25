@@ -1,5 +1,5 @@
-lxc exec $NAME -- ufw allow proto udp from $LXDBRADDR to any port 514
-lxc exec $NAME -- ufw allow proto tcp from $LXDBRADDR to any port 514
+lxc exec $NAME -- ufw allow proto udp from $LXD_NET to any port 514
+lxc exec $NAME -- ufw allow proto tcp from $LXD_NET to any port 514
 lxc exec $NAME -- ufw --force enable
 
 # Listen on udp and tcp 514 and write remote logs to /var/log/<host>/<program>.log

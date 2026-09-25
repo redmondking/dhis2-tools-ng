@@ -7,7 +7,6 @@ GUESTOS="20.04"
 
 # some introspection
 DEFAULT_INTERFACE=$(ip route |grep default | awk '{print $5}')
-LXDBRADDR=$(lxc network get lxdbr0 ipv4.address)
 
 UFW_STATUS=$(sudo ufw status |grep Status|cut -d ' ' -f 2)
 if [[ $UFW_STATUS == "inactive" ]]; then
@@ -55,8 +54,7 @@ for CONTAINER in $CONTAINERS; do
     tmp=$(mktemp)
     sudo cat configs/ufw_proxy /etc/ufw/before.rules > $tmp
     sed -i "s/PROXY_IP/${IP}/g" $tmp
-    # bridge address with prefix, eg 192.168.0.1/24 (iptables masks off the host bits)
-    sed -i "s|LXD_NETWORK|${LXDBRADDR}|g" $tmp
+    sed -i "s|LXD_NETWORK|${LXD_NET}|g" $tmp
     sed -i "s/INTERFACE/$DEFAULT_INTERFACE/" $tmp
 
     sudo mv $tmp /etc/ufw/before.rules

@@ -25,8 +25,13 @@ select yn in "Yes" "No"; do
     esac
 done
 
+echo
+echo "Letsencrypt certificates expire after 90 days."
+read -r -p "Renew the certificate automatically? [Y/n] " ANSWER
+[[ $ANSWER =~ ^[Nn] ]] && RENEWAL=disable || RENEWAL=enable
+
 if [[ $PROXY == "nginx" ]]; then
-	# hooks are saved in the renewal config, so certbot's own timer can renew
+	# the stop/start hooks are saved in the renewal config, so 'certbot renew' works later
 	lxc exec proxy -- certbot certonly -d $FQDN --standalone -m $EMAIL --agree-tos -n --no-eff-email \
 		--pre-hook "service nginx stop" --post-hook "service nginx start"
 
@@ -51,11 +56,20 @@ EOF
 
 	lxc exec proxy -- service nginx restart
 elif [[ $PROXY == "apache2" ]]; then
-	# hooks are saved in the renewal config, so certbot's own timer can renew
+	# the stop/start hooks are saved in the renewal config, so 'certbot renew' works later
 	lxc exec proxy -- certbot certonly --non-interactive --standalone --agree-tos -m $EMAIL -d $FQDN \
 		--pre-hook "service apache2 stop" --post-hook "service apache2 start"
 	lxc exec proxy -- a2dissite 000-default
 	lxc exec proxy -- a2ensite apache-dhis2
 	lxc exec proxy -- service apache2 reload
+fi
 
+# certbot runs renewals from a systemd timer: certbot.timer (apt) or snap.certbot.renew.timer (snap)
+for TIMER in certbot.timer snap.certbot.renew.timer; do
+	lxc exec proxy -- systemctl $RENEWAL --now $TIMER 2>/dev/null
+done
+if [[ $RENEWAL == enable ]]; then
+	echo "Automatic renewal is on. Test it with: lxc exec proxy -- certbot renew --dry-run"
+else
+	echo "Automatic renewal is off. Renew before expiry with: lxc exec proxy -- certbot renew"
 fi

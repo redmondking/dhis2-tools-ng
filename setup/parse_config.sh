@@ -20,6 +20,9 @@ if [[ ! $ENVIRONMENT == "null" ]]; then
   ENVVARS=$(echo $ENVIRONMENT | jq -c "to_entries[]")
 fi
 
+# lxd bridge network in CIDR form, eg 192.168.0.1/24 -> 192.168.0.0/24
+LXD_NET=$(lxc network get lxdbr0 ipv4.address | awk -F'[./]' '{n=$1*16777216+$2*65536+$3*256+$4; n-=n%(2^(32-$5)); printf "%d.%d.%d.%d/%d\n", int(n/16777216), int(n/65536)%256, int(n/256)%256, n%256, $5}')
+
 # get configs for individual containers
 CONTAINERS=$(echo $CONFIG | jq -c .containers[])
 NAMES=$(echo $CONFIG | jq -r .containers[].name)

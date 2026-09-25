@@ -35,6 +35,22 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
    - A service script run without its args prompts for them with defaults (the only postgres container, the next free IP).
    - Destructive commands (delete instance, restore db) always ask for confirmation.
    - Existing flags and args keep working without prompts, so cron and scripted use still work.
+3. **Subdomain per instance** (design agreed, not built). Today every instance is a path on the one
+   `fqdn` (`https://fqdn/<instance>`). Allow an instance to have its own hostname instead
+   (e.g. `hmis.example.org`) with its own proxy server block / VirtualHost and certificate.
+4. **Upgrade path for existing servers.** `setup/upgrade_setup.sh` repairs hosts installed with the
+   old scripts. Every fix that changes installed state needs a matching step there.
+
+## Servlet container per DHIS2 version
+
+The official Ubuntu guide (docs.dhis2.org manual-install-on-ubuntu) and a check of the war files on 2026-09-25 agree:
+
+| DHIS2 | Java | Servlet API | Tomcat | Ubuntu package |
+|---|---|---|---|---|
+| 2.42, 2.43 | 17 | jakarta (Spring 6) | 10.1+ | `tomcat10` on 24.04 |
+| 2.41 and older | 17 / 11 / 8 | javax (Spring 5) | 9 | `tomcat9` exists only up to 22.04 |
+
+Containers are moving to Ubuntu **24.04** (user decision). Unresolved: how to run DHIS2 ≤2.41 there.
 
 ## Roadmap
 
@@ -50,17 +66,18 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
 - [x] `containers/rsyslog_logger*`: wrong subnet `192.168.25.0/24`, `sed '$ a'` lines missing a file argument, `apt upgrade` without `-y`.
 
 ### 2. Modernise
-- [ ] Guest OS 20.04 (EOL) → 22.04. 22.04 still ships `tomcat9` and openjdk 8/11/17.
-      24.04 has **no tomcat9 package**, so moving to it means installing Tomcat from a tarball.
+- [ ] Guest OS 20.04 (EOL) → 24.04 for all containers. Tomcat 9 for DHIS2 ≤2.41 is unresolved (see table above).
+      Scripts hardcode `tomcat9` (service name, `/var/lib/tomcat9`, `/etc/default/tomcat9`), so these become per instance.
 - [ ] PostgreSQL 13 (EOL Nov 2025) and `postgres12` → a single `postgres` type with PostgreSQL 16 and `postgis-3`.
-      `postgresql-13-postgis-2.5` doesn't exist on 22.04 and newer.
+      `postgresql-13-postgis-2.5` doesn't exist on 24.04.
 - [ ] Replace `apt-key` with `/etc/apt/keyrings/*.asc` and `signed-by=`.
 - [ ] Java choice: derive from the release feed instead of `-j 8|11|17` with default 11.
 - [ ] Glowroot: stop hardcoding 0.13.6 and 0.14.2.
 - [ ] Proxy: remove OCSP stapling (Let's Encrypt shut down OCSP in 2025), use `http2 on;` instead of `listen ... http2`, drop `X-XSS-Protection`.
 - [ ] Docs: they still describe Ubuntu 18.04, PostgreSQL 10 and a 2.33 war URL.
 - [ ] Remove `setup/.DS_Store`, `configs/containers.json.exampleused`, `setup/destroy`.
-- [ ] Open question: does DHIS2 2.43 still run on Tomcat 9, or does it need Tomcat 10 (Jakarta)? Check before touching the Tomcat setup.
+- [x] `ssl_setup.sh` asks whether to renew automatically (enables/disables certbot's systemd timer).
+- [x] `setup/upgrade_setup.sh` for servers installed with the old scripts.
 
 ### 3. Multi-version support (see Goals)
 ### 4. Interactive prompts and setup wizard (see Goals)
