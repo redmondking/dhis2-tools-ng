@@ -56,6 +56,24 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
    - `dhis2-move-instance <name> <hostname> [path]` moves an instance to another hostname and/or path.
    - `dhis2-list-instances` shows name, address, version, status.
    - Existing instances: the upgrade script labels them hostname=fqdn, path=container name. No renames.
+5. **Oldest DHIS2 version: 2.38** (user decision). 2.38–2.40 need Java 11 + Tomcat 9 (22.04 container).
+   Offer only versions from the feed with `name >= 2.38`.
+   - Database: one shared PostgreSQL 16 container. The DHIS2 docs require ≥9.6 for 2.38/2.39 and recommend 14,
+     but say nothing about 16. **Test 2.38 on PG16.** If it fails, allow a second postgres container on 14 for old versions.
+6. **Admin password.** After the first war deploy, once DHIS2 is up, ask for a new password for the default `admin` / `district`
+   account, offering a generated strong password as the default.
+7. **Backups.**
+   - The install/setup wizard asks for the backup settings, each with a default:
+     - time of the nightly run (`/etc/cron.d/dhis`)
+     - daily backups to keep (7)
+     - weekly backups to keep (3, taken on Sunday)
+     - monthly backups to keep (12, taken on the 1st; monthly deletion is new, it was never implemented)
+     - backup dir (`/var/pgbackups`)
+     - optional remote rsync target
+     These are written to `/usr/local/etc/dhis/dhis2-env` and the cron job is enabled.
+   - `dhis2-create-instance` asks "Back up this instance? [Y/n]" and adds its database to `PLAIN_BACKUPS`.
+     `dhis2-delete-instance` removes it.
+   - `dhis2-backup` hardcodes the `postgres` container. Use each database's own container once there can be more than one.
 4. **Upgrade path for existing servers.** `setup/upgrade_setup.sh` repairs hosts installed with the
    old scripts. Every fix that changes installed state needs a matching step there.
 
