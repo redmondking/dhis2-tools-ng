@@ -115,6 +115,12 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
   - `/opt/dhis2/files` → `<name>.files.tar.gz`, next to `<name>.sql.gz` in the same backup folder
   - Taken from the instance container of the same name. If no such container exists, skip it with a note.
   - Encrypted the same way as its database (`.files.tar.gz.enc`) when the instance is in `ENCRYPTED_BACKUPS`.
+- [ ] 6.5 `dhis2-delete-instance` also deletes the instance's backups:
+  - Removes `<name>.sql.gz*` and `<name>.files.tar.gz*` from every folder in `BACKUP_DIR`, then any folders left empty.
+  - Asks separately, after the instance confirmation, showing what goes:
+    `Also delete the 23 backups of hmis-hmis (4.1 GB)? This cannot be undone [y/N]`
+  - `-y` alone does not delete backups. Unattended deletion needs `--delete-backups` as well.
+  - Copies already sent to the remote rsync target are not touched (`rsync` runs without `--delete`).
 
 ## Phase 7 – Create an instance from a backup
 
