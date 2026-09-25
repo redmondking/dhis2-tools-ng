@@ -1,11 +1,12 @@
 # dhis2-tools-ng (redmondking fork)
 
 Bash tooling to run DHIS2 on a single Ubuntu host using LXD containers:
-one proxy (nginx or apache2), one postgres, optional munin monitor, and one
+one nginx proxy (apache2 on older installs, being phased out), one postgres, optional munin monitor, and one
 tomcat container per DHIS2 instance.
 
 - `origin`: github.com/redmondking/dhis2-tools-ng
-- `upstream`: github.com/bobjolliffe/dhis2-tools-ng (fork was level with it as of 2026-09-25)
+- `upstream`: github.com/bobjolliffe/dhis2-tools-ng (fork was level with it as of 2026-09-25).
+  This fork is the user's own project and is not contributed back. `upstream` is kept only to pull fixes.
 
 ## Layout
 
@@ -50,7 +51,7 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
      3. Container name [generated].
      Non-interactive: `-H <hostname> -p <path> [name]`.
    - New subdomain: check that DNS resolves to this server. On failure, stop, explain what to check, and offer to retry.
-     Then create its nginx server block / apache VirtualHost and its own certificate, asking about auto-renewal.
+     Then create its nginx server block and its own certificate, asking about auto-renewal.
    - The hostname root (`https://<hostname>/`) always shows a list of links to its instances.
    - Deleting the last instance on a subdomain asks whether to remove the subdomain's proxy config and certificate. Never removes the fqdn.
    - `dhis2-move-instance <name> <hostname> [path]` moves an instance to another hostname and/or path.

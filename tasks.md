@@ -18,7 +18,9 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 ## Phase 1 – Test what's done
 
-- [ ] 1.1 Test server: user has one (details: OS, RAM, how Claude can reach it: TBD)
+- [ ] 1.1 Test server: Ubuntu 24.04, public IP, can be wiped completely.
+  - Claude runs the tests over SSH first. The user re-runs them once all bugs are fixed.
+  - Needs from the user: IP/host, SSH user and key access (root or passwordless sudo), and a test domain with DNS for the fqdn and subdomains (a wildcard record is simplest).
 - [ ] 1.2 Install with the **original** scripts (`a37e7db`) and create an instance with glowroot, then run `upgrade_setup.sh` and check every step
 - [ ] 1.3 Fresh install from `fix/bugs`, then check each fix:
   - `-n`
@@ -53,6 +55,9 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 - [ ] 2.7 Glowroot: one version setting instead of two hardcoded ones
 - [ ] 2.8 `chown root.root` → `root:root`, `tomcat.tomcat` → `tomcat:tomcat`
 - [ ] 2.9 Delete `setup/.DS_Store`, `configs/containers.json.exampleused`, `setup/destroy`
+- [ ] 2.10 nginx is the only proxy for new installs: make `containers.json.sample` and the wizard default to nginx, with no apache choice
+- [ ] 2.11 `upgrade_setup.sh`: on apache servers, offer to switch to nginx via `change_webserver.sh`.
+      Delete apache support (`containers/apache_proxy*`, `configs/apache-dhis2.conf`, apache branches) once that switch is tested
 
 ## Phase 3 – Multiple DHIS2 versions
 
@@ -69,7 +74,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 ## Phase 4 – Hostnames and paths
 
-- [ ] 4.1 Proxy layout with one server block / VirtualHost per hostname. Existing upstream files keep working under the fqdn (see Q3)
+- [ ] 4.1 nginx layout with one server block per hostname. Existing upstream files keep working under the fqdn
 - [ ] 4.2 Page at each hostname root that lists its instances, regenerated whenever instances change
 - [ ] 4.3 DNS check for a new subdomain: on failure, explain what to check and offer to retry
 - [ ] 4.4 Certificate per subdomain, with the auto-renewal prompt
@@ -98,7 +103,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
   - If both are left as defaults, change nothing, but print a warning that the default login is publicly known.
   - If either differs, wait until DHIS2 is up and change it through the API.
   - Skip this step when the instance was restored from a backup.
-- [ ] 5.4 Memory for the instance (Java heap + container limit), default based on free RAM (see Q8)
+- [ ] 5.4 Memory for the instance (Java heap + container limit), default based on free RAM
 
 ## Phase 6 – Backups
 
@@ -192,7 +197,7 @@ Testing: connect ✓  write ✓  delete test file ✓
   - `tomcat` = `tomcat9`
 - [ ] 8.2 Move proxy config to the per-hostname layout
 - [ ] 8.3 `containers.json` type `postgres12` → `postgres`
-- [ ] 8.4 Optional PostgreSQL 13 → 16 upgrade, with a checked backup first (see Q7)
+- [ ] 8.4 Optional PostgreSQL 13 → 16 upgrade, with a checked backup first
 - [ ] 8.5 Keep existing `dhis2-env` backup settings, only adding new keys
 - [ ] 8.6 Move existing backups into the new layout: `backup<date>-<type>/<db>.sql.gz*` → `<db>/<date>-<type>/`.
       Tell the user the remote copy will receive the new layout, and that the old remote folders are left for them to remove.
@@ -221,14 +226,12 @@ Testing: connect ✓  write ✓  delete test file ✓
 - [ ] 10.1 Rewrite `README.md` and `docs/`, which describe Ubuntu 18.04, PostgreSQL 10 and a 2.33 war
 - [ ] 10.2 Switch prompts to `whiptail` once everything above is tested
 
-## Open questions
+## Decisions from the open questions (2026-09-25)
 
-Suggested answers in brackets. Not decided yet.
-
-- Q2 Host Ubuntu versions? [24.04 for new installs; `upgrade_setup.sh` also on 20.04/22.04 hosts]
-- Q3 Keep both nginx and apache? [nginx only for new features; existing apache servers keep working]
-- Q4 Contribute back to `bobjolliffe/dhis2-tools-ng`, or keep it as your own fork? [own fork]
-- Q6 One shared PostgreSQL 16 container? [yes, pending 2.5]
-- Q7 Offer PostgreSQL 13 → 16 upgrade on existing servers? [yes, optional, backup first]
-- Q8 Ask for memory per instance? [yes, default from free RAM]
-- Q11 Munin and Glowroot as yes/no in the wizard? [yes]
+- Host OS: Ubuntu 24.04 for new installs. `upgrade_setup.sh` also runs on existing 20.04/22.04 hosts.
+- Proxy: **nginx only** (see 2.10, 2.11).
+- The fork is the user's own project. Nothing is contributed back to `bobjolliffe/dhis2-tools-ng`. `upstream` stays as a remote, to pull fixes.
+- One shared PostgreSQL 16 container (2.5 checks 2.38 on it).
+- PostgreSQL 13 → 16 upgrade on existing servers: optional, with a checked backup (8.4).
+- Memory per instance: asked, with a default based on free RAM (5.4).
+- Munin and Glowroot: yes/no in the wizard, both defaulting to yes (5.1).
