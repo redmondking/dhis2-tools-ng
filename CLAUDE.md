@@ -76,12 +76,15 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
      These are written to `/usr/local/etc/dhis/dhis2-env` and the cron job is enabled.
    - `dhis2-create-instance` asks "Back up this instance? [Y/n]" and adds its database to `PLAIN_BACKUPS`.
      `dhis2-delete-instance` removes it.
+   - `dhis2-backup` also archives each instance's `/opt/dhis2/files` (the DHIS2 file store, which is not in the database dump),
+     encrypted when its database is.
    - `dhis2-backup` hardcodes the `postgres` container. Use each database's own container once there can be more than one.
 7. **Upgrade path for existing servers.** `setup/upgrade_setup.sh` repairs hosts installed with the
    old scripts. Every fix that changes installed state needs a matching step there.
 8. **Create an instance from a backup.** `dhis2-create-instance` asks whether there is a backup to restore, and which DHIS2 version it is from.
    - It restores the backup before DHIS2 first starts, then deploys that version's war.
    - Versions older than 2.38 are refused.
+   - Accepts encrypted backups (asks for the password file), and restores the matching file-store archive if one is present.
 9. **DHIS2 version upgrade script** (`dhis2-upgrade-instance`). To be built **last**, because it has many variables (see tasks.md phase 9).
    In particular, 2.41 → 2.42 moves from a Tomcat 9 / 22.04 container to a Tomcat 10 / 24.04 one.
 

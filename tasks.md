@@ -111,6 +111,10 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
   - optional remote rsync target
 - [ ] 6.2 `dhis2-backup`: delete old monthly backups, use each database's own container, quote names
 - [ ] 6.3 `dhis2-create-instance`: "Back up this instance? [Y/n]" adds it to `PLAIN_BACKUPS`. `dhis2-delete-instance` removes it
+- [ ] 6.4 `dhis2-backup` also backs up each instance's file store:
+  - `/opt/dhis2/files` → `<name>.files.tar.gz`, next to `<name>.sql.gz` in the same backup folder
+  - Taken from the instance container of the same name. If no such container exists, skip it with a note.
+  - Encrypted the same way as its database (`.files.tar.gz.enc`) when the instance is in `ENCRYPTED_BACKUPS`.
 
 ## Phase 7 – Create an instance from a backup
 
@@ -120,7 +124,8 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
   - Backups older than 2.38 are refused with an explanation.
 - [ ] 7.2 Restore into the new database **before** DHIS2 first starts, deploying the war for that version (reuses `dhis2-restoredb -y`)
 - [ ] 7.3 Skip the admin login step (5.3), since the backup brings its own users
-- [ ] 7.4 Encrypted backups (`.sql.gz.enc`) and the DHIS2 file store (see Q12, Q13)
+- [ ] 7.4 Accept encrypted backups (`.sql.gz.enc`): ask for the password file [`PASSWORD_FILE` from `dhis2-env`]. `dhis2-restoredb` gets the same support
+- [ ] 7.5 If a matching `<name>.files.tar.gz[.enc]` sits next to the database backup, offer to restore it into `/opt/dhis2/files` (owned by tomcat)
 
 ## Phase 8 – Bring existing servers forward (`upgrade_setup.sh`)
 
@@ -169,5 +174,3 @@ Suggested answers in brackets. Not decided yet.
 - Q7 Offer PostgreSQL 13 → 16 upgrade on existing servers? [yes, optional, backup first]
 - Q8 Ask for memory per instance? [yes, default from free RAM]
 - Q11 Munin and Glowroot as yes/no in the wizard? [yes]
-- Q12 Restore encrypted backups? [yes, ask for the password file]
-- Q13 Back up the DHIS2 file store (`/opt/dhis2/files`: uploaded documents, images) as well as the database? [yes, it isn't in the database dump]
