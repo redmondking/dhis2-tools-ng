@@ -132,6 +132,45 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
   - Taken from the instance container of the same name. If no such container exists, skip it with a note.
   - Encrypted the same way as its database (`.files.tar.gz.enc`) when the instance is in `ENCRYPTED_BACKUPS`.
 
+### Remote backups
+
+- [ ] 6.6 `dhis2-backup-remote` with subcommands:
+  - `add` (prompts, as in the example below)
+  - `list` (name, type, target, mode, last success, status)
+  - `test <name>`
+  - `sync [name]` (send now)
+  - `remove <name>` (asks first, never deletes anything on the remote)
+
+  Any number of remotes, each stored in `/usr/local/etc/dhis/remotes/<name>`.
+- [ ] 6.7 Remote types (both):
+  - **SSH server** via `rsync`. `add` creates a key per remote (`/root/.ssh/dhis2-backup-<name>`), offers to install it with `ssh-copy-id`, then tests connect, write and delete.
+  - **Cloud storage** via `rclone` (S3, Backblaze B2, Google Drive, Azure, ...). Install the Ubuntu package when the first cloud remote is added.
+- [ ] 6.8 Mode per remote, chosen in `add`:
+  - `keep` (default): never delete on the remote
+  - `mirror`: delete what is deleted locally (`rsync --delete` / `rclone sync`)
+- [ ] 6.9 Adding a cloud remote while some instances are backed up unencrypted:
+  - Warn, naming the instances.
+  - Offer to switch them to encrypted (`ENCRYPTED_BACKUPS`), creating the password file if there isn't one.
+  - Remind the user to keep a copy of the password file off the server, since the backups can't be restored without it.
+- [ ] 6.10 `dhis2-backup` sends to every remote after the local run.
+  - A failed remote doesn't stop the others.
+  - Results are logged to `/var/log/dhis2-backup.log` and shown by `list`.
+- [ ] 6.11 Setup wizard asks "Add a remote backup location now? [y/N]" and runs `add`.
+- [ ] 6.12 Later: alert on failure (e.g. email to the address in `containers.json`). No `fetch` from remotes (user decision).
+
+Example:
+```
+$ sudo dhis2-backup-remote add
+Name for this remote: offsite1
+Type: 1) Another server over SSH  2) Cloud storage (S3, Backblaze B2, Google Drive, ...)
+Server: backup.example.org
+Username on that server: dhis2backup
+Folder on that server [/backups/hmis.example.com]:
+Old backups on the remote: 1) Keep everything  2) Mirror
+Install the key on backup.example.org now? [Y/n]
+Testing: connect ✓  write ✓  delete test file ✓
+```
+
 ## Phase 7 – Create an instance from a backup
 
 - [ ] 7.1 `dhis2-create-instance` asks "Restore from a backup? [y/N]":
@@ -157,6 +196,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 - [ ] 8.5 Keep existing `dhis2-env` backup settings, only adding new keys
 - [ ] 8.6 Move existing backups into the new layout: `backup<date>-<type>/<db>.sql.gz*` → `<db>/<date>-<type>/`.
       Tell the user the remote copy will receive the new layout, and that the old remote folders are left for them to remove.
+- [ ] 8.7 Turn an old `REMOTE=` setting in `dhis2-env` into remote `remote1`, SSH type, mode `keep` (same behaviour as before)
 
 ## Phase 9 – DHIS2 version upgrade script (last)
 

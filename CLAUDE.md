@@ -80,6 +80,11 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
      `<instance>.sql.gz[.enc]` and `<instance>.files.tar.gz[.enc]`.
    - `dhis2-backup` also archives each instance's `/opt/dhis2/files` (the DHIS2 file store, which is not in the database dump),
      encrypted when its database is.
+   - Remote copies: `dhis2-backup-remote add|list|test|sync|remove`, any number of remotes (`/usr/local/etc/dhis/remotes/<name>`).
+     - Types: SSH server (`rsync`, one key per remote) or cloud (`rclone`).
+     - Mode per remote: `keep` (default, never delete) or `mirror`.
+     - Adding a cloud remote warns about unencrypted instances and offers to encrypt them.
+     - No fetch from remotes, and failure alerts come later.
    - `dhis2-backup` hardcodes the `postgres` container. Use each database's own container once there can be more than one.
 7. **Upgrade path for existing servers.** `setup/upgrade_setup.sh` repairs hosts installed with the
    old scripts. Every fix that changes installed state needs a matching step there.
