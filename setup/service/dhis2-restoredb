@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #       ____  __  ______________
 #      / __ \/ / / /  _/ ___/__ \
 #     / / / / /_/ // / \__ \__/ /
@@ -10,20 +10,45 @@
 set -e
 
 PROG=`basename $0`
-BACKUPFILE=$1
-DB=$2
 
 usage() {
-  echo "Usage: $PROG <backup file (tar.gz)> <dbname>"
-  echo "  backup file: database dump in tar gzip format"
+  echo "Usage: $PROG [-y] <backup file (sql.gz)> <dbname>"
+  echo "  backup file: gzipped plain sql dump, as made by dhis2-backup"
   echo "  dbname: the name of the database to restore"
   echo "Options:"
+  echo "  -y               Do not ask for confirmation"
   echo "  -h, --help       Display this help message"
 }
 
+CONFIRM=true
+while getopts hy opt
+do
+  case $opt in
+    y) CONFIRM=false;;
+    *) usage; exit 1;;
+  esac
+done
+shift $((OPTIND - 1))
 
+if [ "$#" -ne 2 ]; then
+  usage
+  exit 1
+fi
 
-sudo lxc exec postgres dropdb $DB
+BACKUPFILE=$1
+DB=$2
+
+if [ ! -f "$BACKUPFILE" ]; then
+  echo "No such file: $BACKUPFILE"
+  exit 1
+fi
+
+if [[ $CONFIRM == true ]]; then
+  read -r -p "Replace database $DB with the contents of $BACKUPFILE? The current $DB will be dropped [y/N] " ANSWER
+  [[ $ANSWER =~ ^[Yy]$ ]] || { echo "Aborted"; exit 1; }
+fi
+
+sudo lxc exec postgres -- dropdb --if-exists $DB
 sudo lxc exec postgres -- createdb -O $DB $DB
 zcat $BACKUPFILE | grep -v 'ALTER .* OWNER' | sudo lxc exec postgres -- psql $DB
 echo "REASSIGN OWNED BY root TO $DB" | sudo lxc exec postgres -- psql $DB

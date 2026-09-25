@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 
 # Parse json config file
 source parse_config.sh
@@ -26,8 +26,9 @@ select yn in "Yes" "No"; do
 done
 
 if [[ $PROXY == "nginx" ]]; then
-	lxc exec proxy -- service nginx stop
-	lxc exec proxy -- certbot certonly -d $FQDN --standalone -m $EMAIL --agree-tos -n --no-eff-email
+	# hooks are saved in the renewal config, so certbot's own timer can renew
+	lxc exec proxy -- certbot certonly -d $FQDN --standalone -m $EMAIL --agree-tos -n --no-eff-email \
+		--pre-hook "service nginx stop" --post-hook "service nginx start"
 
 	####
 	# ssl-files.conf
@@ -47,18 +48,14 @@ EOF
 
 	lxc file push /tmp/nginx.conf proxy/etc/nginx/nginx.conf
 	rm /tmp/nginx.conf
-	# setup auto renewal
-	lxc exec proxy --  echo '0 3 * * * root certbot renew --standalone --pre-hook="service nginx stop" --post-hook="service nginx start"/' > /etc/cron.d/certbot
 
-	lxc exec proxy -- service nginx start
+	lxc exec proxy -- service nginx restart
 elif [[ $PROXY == "apache2" ]]; then
-	lxc exec proxy -- service apache2 stop 
-	lxc exec proxy -- certbot certonly --non-interactive --standalone --agree-tos -m $EMAIL -d $FQDN
+	# hooks are saved in the renewal config, so certbot's own timer can renew
+	lxc exec proxy -- certbot certonly --non-interactive --standalone --agree-tos -m $EMAIL -d $FQDN \
+		--pre-hook "service apache2 stop" --post-hook "service apache2 start"
 	lxc exec proxy -- a2dissite 000-default
 	lxc exec proxy -- a2ensite apache-dhis2
 	lxc exec proxy -- service apache2 reload
-	lxc exec proxy -- service apache2 start
-	# setup auto renewal
-	lxc exec proxy --  echo '0 3 * * * root certbot renew --standalone --pre-hook="service apache2 stop" --post-hook="service apache2 start"/' > /etc/cron.d/certbot
 
 fi

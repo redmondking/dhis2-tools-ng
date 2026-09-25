@@ -38,16 +38,16 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
 
 ## Roadmap
 
-### 1. Bug fixes
-- [ ] `service/dhis2-create-instance`: `if [ $CREATEDB ]` is always true, so `-n` is ignored.
-- [ ] `service/dhis2-create-instance` + `etc/tomcat_default`: the template has `{{ JAVA_VERSION }}` but sed replaces only `JAVA_VERSION`, giving `java-{{ 17 }}-...`. The non-glowroot branch substitutes nothing. The path hardcodes `amd64`.
-- [ ] `service/dhis2-create-instance`: free-IP detection uses gawk-only `strtonum`, but Ubuntu's default awk is mawk.
-- [ ] `ssl_setup.sh`: the renewal cron `lxc exec proxy -- echo ... > /etc/cron.d/certbot` writes to the **host**, with a stray trailing `/`. Renewal likely never works.
-- [ ] `service/dhis2-delete-instance`: requires 2 args despite a postgres default. The `/etc/hosts` sed uses undefined `$N`, so it deletes any line ending in a space. No confirmation before dropdb.
-- [ ] `service/dhis2-restoredb`: no argument validation, and `usage` is never called.
-- [ ] `configs/sysctl`: typo `max_user_watchesi`. `lxd_setup.sh` appends it on every run and never applies it (`sysctl --system`).
-- [ ] `create_containers.sh`: NAT network hardcoded to `192.168.0.0/24` (`# FIX THIS`).
-- [ ] `containers/rsyslog_logger*`: wrong subnet `192.168.25.0/24`, `sed '$ a'` lines missing a file argument, `apt upgrade` without `-y`.
+### 1. Bug fixes (done on `fix/bugs`, not yet tested on a real host)
+- [x] `service/dhis2-create-instance`: `if [ $CREATEDB ]` is always true, so `-n` is ignored.
+- [x] `service/dhis2-create-instance` + `etc/tomcat_default`: the template has `{{ JAVA_VERSION }}` but sed replaces only `JAVA_VERSION`, giving `java-{{ 17 }}-...`. The non-glowroot branch substitutes nothing. The path hardcodes `amd64`.
+- [x] `service/dhis2-create-instance`: free-IP detection uses gawk-only `strtonum`, but Ubuntu's default awk is mawk.
+- [x] `ssl_setup.sh`: the renewal cron `lxc exec proxy -- echo ... > /etc/cron.d/certbot` writes to the **host**, with a stray trailing `/`. Renewal likely never works.
+- [x] `service/dhis2-delete-instance`: requires 2 args despite a postgres default. The `/etc/hosts` sed uses undefined `$N`, so it deletes any line ending in a space. No confirmation before dropdb.
+- [x] `service/dhis2-restoredb`: no argument validation, and `usage` is never called.
+- [x] `configs/sysctl`: typo `max_user_watchesi`. `lxd_setup.sh` appends it on every run and never applies it (`sysctl --system`).
+- [x] `create_containers.sh`: NAT network hardcoded to `192.168.0.0/24` (`# FIX THIS`).
+- [x] `containers/rsyslog_logger*`: wrong subnet `192.168.25.0/24`, `sed '$ a'` lines missing a file argument, `apt upgrade` without `-y`.
 
 ### 2. Modernise
 - [ ] Guest OS 20.04 (EOL) → 22.04. 22.04 still ships `tomcat9` and openjdk 8/11/17.

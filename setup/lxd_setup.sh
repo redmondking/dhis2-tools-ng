@@ -16,7 +16,8 @@ snap install lxd
 cat configs/lxd_preseed | sudo lxd init --preseed
 
 # kernel tweaks
-cat configs/sysctl >> /etc/sysctl.conf
+cp configs/sysctl /etc/sysctl.d/60-dhis2-lxd.conf
+sysctl --system || echo "Warning: some kernel settings could not be applied"
 
 sudo ufw route allow in on lxdbr0
 sudo ufw route allow out on lxdbr0

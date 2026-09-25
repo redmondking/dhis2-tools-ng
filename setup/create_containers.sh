@@ -55,9 +55,8 @@ for CONTAINER in $CONTAINERS; do
     tmp=$(mktemp)
     sudo cat configs/ufw_proxy /etc/ufw/before.rules > $tmp
     sed -i "s/PROXY_IP/${IP}/g" $tmp
-    # FIX THIS
-    #sed -i "s/LXD_NETWORK/${NETWORK}/g" $tmp
-    sed -i "s/LXD_NETWORK/192.168.0.0\/24/g" $tmp
+    # bridge address with prefix, eg 192.168.0.1/24 (iptables masks off the host bits)
+    sed -i "s|LXD_NETWORK|${LXDBRADDR}|g" $tmp
     sed -i "s/INTERFACE/$DEFAULT_INTERFACE/" $tmp
 
     sudo mv $tmp /etc/ufw/before.rules
