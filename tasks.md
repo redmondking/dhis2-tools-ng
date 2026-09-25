@@ -91,7 +91,9 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 ## Phase 5 – Interactive setup and instance creation
 
-- [ ] 5.1 Setup wizard: asks FQDN, email, TZ, proxy, monitoring, APM, then writes `containers.json`
+- [ ] 5.1 Setup wizard `setup.sh`: asks FQDN, email, TZ, monitoring, Glowroot defaults and login mode, backups, then writes `containers.json`
+- [ ] 5.1a `setup.sh --config <file|->`: the same install with no prompts, for Ansible and the Nuxt app.
+      Secrets are accepted in the input and stripped before saving. Update `containers.json.sample` to the full format
 - [ ] 5.2 Service scripts prompt for missing arguments when run in a terminal:
   - `dhis2-deploy-war`
   - `dhis2-logview`

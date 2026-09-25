@@ -158,7 +158,7 @@ It will drive these scripts, probably over `ssh <server> sudo <command>`. So eve
 
 - Every input has a flag. Prompts appear only when a value is missing **and** stdin is a TTY.
 - When stdin is not a TTY and a required value is missing, exit non-zero naming the missing flag. Never hang waiting for input.
-- Secrets never go in argv (visible in `ps`). Read them from stdin, e.g. `--password-stdin`, like `docker login`.
+- Secrets never go in argv (visible in `ps`). Read them from stdin (`--password-stdin`, like `docker login`) or from the `--config` JSON.
 - Destructive actions take `-y` to skip confirmation.
 - Exit code 0 on success, non-zero on failure. Errors go to stderr.
 - List and status commands get a `--json` output as they are built (`dhis2-list-instances`, backups, remotes).
@@ -167,9 +167,17 @@ It will drive these scripts, probably over `ssh <server> sudo <command>`. So eve
 
 ## Install
 
-- Option A (agreed): installs go through the setup wizard. No unattended installs for now.
-- `containers.json.sample` stays until the wizard exists (phase 5), then is deleted.
-- Later, possibly: the wizard saves its answers (no passwords) so `setup.sh --answers <file>` can replay them.
+Two ways, both required:
+
+- **People**: `sudo ./setup.sh` runs the wizard (plain bash prompts for now), which writes `containers.json`.
+- **Automation** (Ansible, the future Nuxt app): `sudo ./setup.sh --config <file|->` asks nothing.
+  All answers come from the file, or from stdin with `-`, in the same JSON format the wizard writes.
+  - Secrets (Munin password, shared Glowroot password, ...) may be included in that input. `setup.sh` strips them before saving
+    `/usr/local/etc/dhis/containers.json`, which never holds plaintext passwords.
+  - A missing required value is an error naming it. It never falls back to a prompt when stdin isn't a TTY.
+  - `configs/containers.json.sample` stays as the documented example of this format, kept complete and in sync with the wizard.
+- Single-secret commands (e.g. `dhis2-munin-login`, `dhis2-glowroot-login`, instance creation in own-login mode) take `--password-stdin`.
+- Ansible example: template the JSON (secrets from Ansible Vault) to a root-only file, run `setup.sh --config` on it, then delete it.
 
 ## Conventions
 
