@@ -9,7 +9,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 - [~] 0.1 `dhis2-create-instance`: `-n` ignored, `JAVA_HOME` rendered as `java-{{ 17 }}-...`, gawk-only free-IP pick, prefix-matching name checks
 - [~] 0.2 `ssl_setup.sh`: renewal cron written to the host. Now uses certbot's own timer, with a prompt for auto-renewal
-- [~] 0.3 `dhis2-delete-instance`: required 2 args, broke `/etc/hosts`, no confirmation
+- [~] 0.3 `dhis2-delete-instance`: required 2 args, broke `/etc/hosts`, no confirmation, left the instance's `pg_hba.conf` line and postgres firewall rule behind
 - [~] 0.4 `dhis2-restoredb`: no argument checks, no confirmation
 - [~] 0.5 sysctl typo, appended on every run and never applied
 - [~] 0.6 NAT network hardcoded to `192.168.0.0/24`

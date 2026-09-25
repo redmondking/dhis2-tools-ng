@@ -68,11 +68,22 @@ else
   exit 1
 fi
 
+# remember the IP before the container goes, to clean up database access below
+IP=$(lxc config device get $NAME eth0 ipv4.address 2>/dev/null)
+
 lxc stop $NAME
 lxc delete $NAME
 
 lxc exec ${DBCONTAINER} -- dropdb $NAME
 lxc exec ${DBCONTAINER} -- dropuser $NAME
+
+# remove the instance's access to postgres, so a future container reusing the IP doesn't inherit it
+PGMAJOR=$(lxc exec ${DBCONTAINER} -- psql -t -c 'show server_version' postgres | awk '{print int($1)}')
+lxc exec ${DBCONTAINER} -- sed -i "/^ *host ${NAME} ${NAME} /d" /etc/postgresql/$PGMAJOR/main/pg_hba.conf
+lxc exec ${DBCONTAINER} -- service postgresql reload
+if [[ -n $IP ]]; then
+  lxc exec ${DBCONTAINER} -- ufw delete allow proto tcp from $IP to any port 5432
+fi
 
 sudo sed -i "/ ${NAME}$/d" /etc/hosts
 
