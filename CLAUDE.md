@@ -35,9 +35,14 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
    - A service script run without its args prompts for them with defaults (the only postgres container, the next free IP).
    - Destructive commands (delete instance, restore db) always ask for confirmation.
    - Existing flags and args keep working without prompts, so cron and scripted use still work.
-3. **Subdomain per instance** (design agreed, not built). Today every instance is a path on the one
-   `fqdn` (`https://fqdn/<instance>`). Allow an instance to have its own hostname instead
-   (e.g. `hmis.example.org`) with its own proxy server block / VirtualHost and certificate.
+3. **Multiple hostnames** (design agreed with user, not built). Instances stay on a path
+   (`https://<host>/<instance>`), but each instance chooses its host, and hosts can be shared:
+   `hmis.example.com/hmis`, `hmis.example.com/training`, `hmis2.example.com/hmis2`.
+   - `fqdn` in `containers.json` is the default host. Record each instance's host with `lxc config set <name> user.dhis2.hostname`.
+   - `dhis2-create-instance` asks for the host: pick one already in use, or enter a new one.
+   - A new host gets its own nginx server block / apache VirtualHost and its own Let's Encrypt certificate.
+     Check that its DNS resolves to this server before calling certbot (failed requests risk rate limits).
+   - Existing instances (upstream files directly in `/etc/nginx/upstream` or `/etc/apache2/upstream`) must keep working as `fqdn`'s.
 4. **Upgrade path for existing servers.** `setup/upgrade_setup.sh` repairs hosts installed with the
    old scripts. Every fix that changes installed state needs a matching step there.
 
@@ -50,7 +55,8 @@ The official Ubuntu guide (docs.dhis2.org manual-install-on-ubuntu) and a check 
 | 2.42, 2.43 | 17 | jakarta (Spring 6) | 10.1+ | `tomcat10` on 24.04 |
 | 2.41 and older | 17 / 11 / 8 | javax (Spring 5) | 9 | `tomcat9` exists only up to 22.04 |
 
-Containers are moving to Ubuntu **24.04** (user decision). Unresolved: how to run DHIS2 ≤2.41 there.
+Decision (user, 2026-09-25): proxy, postgres and monitor containers, and instances of DHIS2 2.42+, use Ubuntu **24.04** with `tomcat10`.
+Instances of DHIS2 ≤2.41 use a **22.04** container with `tomcat9`, as the official DHIS2 guide does (22.04 standard support ends April 2027).
 
 ## Roadmap
 
@@ -66,7 +72,7 @@ Containers are moving to Ubuntu **24.04** (user decision). Unresolved: how to ru
 - [x] `containers/rsyslog_logger*`: wrong subnet `192.168.25.0/24`, `sed '$ a'` lines missing a file argument, `apt upgrade` without `-y`.
 
 ### 2. Modernise
-- [ ] Guest OS 20.04 (EOL) → 24.04 for all containers. Tomcat 9 for DHIS2 ≤2.41 is unresolved (see table above).
+- [ ] Guest OS 20.04 (EOL) → 24.04, except DHIS2 ≤2.41 instances on 22.04 (see table above).
       Scripts hardcode `tomcat9` (service name, `/var/lib/tomcat9`, `/etc/default/tomcat9`), so these become per instance.
 - [ ] PostgreSQL 13 (EOL Nov 2025) and `postgres12` → a single `postgres` type with PostgreSQL 16 and `postgis-3`.
       `postgresql-13-postgis-2.5` doesn't exist on 24.04.
