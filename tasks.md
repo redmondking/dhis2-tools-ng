@@ -18,7 +18,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 ## Phase 1 – Test what's done
 
-- [ ] 1.1 Test server: fresh Ubuntu 24.04 VM, ~8 GB RAM, that can be wiped (see Q1)
+- [ ] 1.1 Test server: user has one (details: OS, RAM, how Claude can reach it: TBD)
 - [ ] 1.2 Install with the **original** scripts (`a37e7db`) and create an instance with glowroot, then run `upgrade_setup.sh` and check every step
 - [ ] 1.3 Fresh install from `fix/bugs`, then check each fix:
   - `-n`
@@ -225,7 +225,6 @@ Testing: connect ✓  write ✓  delete test file ✓
 
 Suggested answers in brackets. Not decided yet.
 
-- Q1 Test server available? [fresh 24.04 VM, 8 GB]
 - Q2 Host Ubuntu versions? [24.04 for new installs; `upgrade_setup.sh` also on 20.04/22.04 hosts]
 - Q3 Keep both nginx and apache? [nginx only for new features; existing apache servers keep working]
 - Q4 Contribute back to `bobjolliffe/dhis2-tools-ng`, or keep it as your own fork? [own fork]
