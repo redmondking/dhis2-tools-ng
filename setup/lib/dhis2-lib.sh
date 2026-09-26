@@ -121,3 +121,118 @@ glowroot_write_admin() {
   lxc config set "$name" user.dhis2.glowroot "$mode"
   lxc config set "$name" user.dhis2.glowroot.user "$GR_USER"
 }
+
+########################################################################
+# DHIS2 releases, from the official release feed.
+# Every release has a full name (2.42.0, 2.42.5.2 for a hotfix) and users must type it exactly.
+
+FEED_URL=https://releases.dhis2.org/v1/versions/stable.json
+OLDEST_LINE=38   # 2.38 is the oldest DHIS2 version these tools install
+
+feed_load() {
+  [[ -n ${FEED:-} ]] && return 0
+  FEED=$(curl -fsSL "$FEED_URL") || die "could not download the DHIS2 release list from $FEED_URL"
+}
+
+# feed_show [LINE] [CURRENT]: one row per version line (only LINE if given), CURRENT shown as [2.42.3]
+feed_show() {
+  jq -r --arg line "${1-}" --arg cur "${2-}" --argjson oldest $OLDEST_LINE '
+    .versions[] | select((.name | split(".")[1] | tonumber) >= $oldest) | select($line == "" or .name == $line)
+    | "  \(.name)  \(if .supported then "supported     " else "end of support" end)  "
+      + ([.patchVersions[].name | if . == $cur then "[\(.)]" else . end] | join(" "))' <<< "$FEED"
+}
+
+# feed_release NAME: exact release name -> sets REL_NAME REL_URL REL_SHA REL_JDK REL_LINE; returns 1 if there is none
+feed_release() {
+  local row
+  row=$(jq -r --arg n "$1" --argjson oldest $OLDEST_LINE '
+    .versions[] | select((.name | split(".")[1] | tonumber) >= $oldest) as $v
+    | $v.patchVersions[] | select(.name == $n)
+    | [.name, .url, .sha256, ($v.jdk | tostring), $v.name] | @tsv' <<< "$FEED" | head -1)
+  [[ -n $row ]] || return 1
+  # shellcheck disable=SC2034  # REL_* are used by the calling scripts
+  IFS=$'\t' read -r REL_NAME REL_URL REL_SHA REL_JDK REL_LINE <<< "$row"
+}
+
+# feed_newest [LINE]: newest release overall, or in LINE
+feed_newest() {
+  jq -r --arg line "${1-}" --argjson oldest $OLDEST_LINE '
+    [.versions[] | select((.name | split(".")[1] | tonumber) >= $oldest) | select($line == "" or .name == $line)]
+    | .[0].patchVersions[-1].name' <<< "$FEED"
+}
+
+# ask_release VAR [LINE] [CURRENT] [GIVEN]: the release to use, from GIVEN (-V) or asked on the terminal.
+# Only checks that the release exists (and is 2.38+); leaves REL_* set for it.
+ask_release() {
+  local __var=$1 __line=${2-} __current=${3-} __given=${4-} __default __answer
+  __default=$(feed_newest "$__line")
+  if [[ -n $__given ]]; then
+    feed_release "$__given" || die "$__given is not a DHIS2 release: give the exact name, e.g. -V $__default"
+    printf -v "$__var" '%s' "$__given"
+    return 0
+  fi
+  [[ -t 0 ]] || die "no DHIS2 release given: use -V <release>, e.g. -V $__default"
+  echo "DHIS2 releases (end of support = no more security fixes):" >&2
+  feed_show "$__line" "$__current" >&2
+  while true; do
+    read -r -p "Release [$__default]: " __answer
+    __answer=${__answer:-$__default}
+    feed_release "$__answer" && break
+    echo "$__answer is not in the list: type the exact release, e.g. $__default" >&2
+  done
+  printf -v "$__var" '%s' "$__answer"
+}
+
+release_line() { cut -d. -f1,2 <<< "$1"; }                                     # 2.42.5.2 -> 2.42
+tomcat_for_line() { if (( ${1#2.} >= 42 )); then echo tomcat10; else echo tomcat9; fi; }   # 2.42+ is Jakarta
+guestos_for_tomcat() { if [[ $1 == tomcat10 ]]; then echo 24.04; else echo 22.04; fi; }   # tomcat9 ends at 22.04
+release_older() { [[ $1 != "$2" && $(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1) == "$1" ]]; }  # is $1 < $2
+# war_release WARFILE: the DHIS2 release inside a war, from its WEB-INF/lib/dhis-api-<release>.jar
+war_release() { unzip -Z1 "$1" 2>/dev/null | sed -n 's|^WEB-INF/lib/dhis-api-\(.*\)\.jar$|\1|p' | head -1; }
+
+########################################################################
+# Instances and wars
+
+# instance_tomcat NAME: tomcat9 or tomcat10 (instances from before the label existed are tomcat9)
+instance_tomcat() {
+  local t
+  t=$(lxc config get "$1" user.dhis2.tomcat 2>/dev/null)
+  echo "${t:-tomcat9}"
+}
+
+# download_war DIR: download the release in REL_* to DIR/dhis.war and check it against the published sha256.
+# Tries 3 times, then asks whether to try again (no terminal: returns 1). There is no "use it anyway".
+download_war() {
+  local dir=$1 attempt choice
+  while true; do
+    for attempt in 1 2 3; do
+      echo "Downloading DHIS2 $REL_NAME (attempt $attempt of 3)" >&2
+      if curl -fL --progress-bar -o "$dir/dhis.war" "$REL_URL" \
+         && [[ $(sha256sum "$dir/dhis.war" | cut -d' ' -f1) == "$REL_SHA" ]]; then
+        echo "Checksum ok" >&2
+        return 0
+      fi
+      echo "The download failed or does not match its published checksum" >&2
+    done
+    [[ -t 0 ]] || return 1
+    echo "The download of $REL_NAME does not match its published checksum (tried 3 times)." >&2
+    echo "  1) Try again" >&2
+    echo "  2) Stop" >&2
+    read -r -p "Choice [1]: " choice
+    [[ ${choice:-1} == 1 ]] || return 1
+  done
+}
+
+# deploy_war NAME WARFILE RELEASE: replace the instance's DHIS2 with WARFILE and start it
+deploy_war() {
+  local name=$1 war=$2 release=$3 t
+  t=$(instance_tomcat "$name")
+  lxc exec "$name" -- service "$t" stop
+  lxc exec "$name" -- sh -c "rm -rf /var/lib/$t/webapps/*"
+  lxc file push "$war" "$name/tmp/dhis.war"
+  lxc exec "$name" -- mkdir -p "/var/lib/$t/webapps/$name"
+  lxc exec "$name" -- unzip -q -d "/var/lib/$t/webapps/$name" /tmp/dhis.war
+  lxc exec "$name" -- rm /tmp/dhis.war
+  lxc config set "$name" user.dhis2.version "$release"
+  lxc exec "$name" -- service "$t" start
+}
