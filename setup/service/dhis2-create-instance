@@ -5,13 +5,13 @@
 #    / /_/ / __  // / ___/ / __/
 #   /_____/_/ /_/___//____/____/
 #
-#   Script to deploy a dhis2 instance
+#   Create a DHIS2 instance: its own container, database and proxy entry, with DHIS2 deployed
 
 PROG=$(basename "$0")
+# shellcheck source=../lib/dhis2-lib.sh
 source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
 
 CONF=/usr/local/etc/dhis/containers.json
-CREATEDB=true
 TOMCAT_SETUP=/usr/local/etc/dhis/tomcat_setup
 GLOWROOT_VERSION=0.14.7
 
@@ -23,50 +23,210 @@ GLOWROOT_LOGIN=$(jq -r '.glowroot_login // "own"' $CONF)
 
 ###############################################################
 usage() {
-  echo "Usage: $PROG [options] <instance> [<ip>] [<postgres_container>]"
-  echo "  instance: name of the dhis2 instance to create"
-  echo "  ip: the ip address of the container (default picks next free IP ending in .10 to .19"
-  echo "  postgres_container: the name of postgresql container (default postgres)"
-  echo "Options:"
-  echo "  -h, --help        Display this help message"
-  echo "  -n                Do NOT create database for instance"
-  echo "  -V <release>      DHIS2 release, exact name from the list (e.g. 2.42.6); asked on a terminal"
-  echo "  -g <yes|no>       Install Glowroot (default from containers.json \"apm\", asked on a terminal)"
-  echo "  -m <yes|no>       Monitor with Munin (only when Munin is installed; default yes)"
-  echo "  -U <username>     Glowroot username (default admin)"
-  echo "  --password-stdin  Read the Glowroot password from stdin"
+  cat <<EOF
+Usage: $PROG [options] <instance> [<ip>] [<postgres_container>]
+  instance                    name of the instance (also its container and database name)
+
+What to deploy (asked on a terminal):
+  -V, --release <release>     official DHIS2 release, exact name from the list (e.g. 2.42.6)
+  -f, --file <war>            own war file on this server
+  -l, --url <url>             own war at a URL
+      --sha256 <checksum>     check an own war against this sha256
+      --based-on <version>    DHIS2 version an own war is built on (e.g. 2.41), if it can't be read from the war
+      --no-deploy             create the instance without DHIS2 (deploy later with dhis2-deploy-war)
+      --line <version>        with --no-deploy: the DHIS2 version it will run (e.g. 2.42); decides Ubuntu, Tomcat, Java
+Monitoring:
+  -g, --glowroot yes|no       install Glowroot (default on a terminal: from containers.json "apm")
+  -U, --glowroot-user <name>  Glowroot username (default admin)
+  -m, --munin yes|no          monitor with Munin (only when Munin is installed; default on a terminal: yes)
+Placement:
+      --ip <ip>               container IP (default: the next free address ending in .10 to .19)
+      --postgres <container>  postgres container (default: postgres)
+  -n, --no-database           do not create a database
+Automation:
+  -y, --yes                   ask nothing: every required value must be given as a flag
+      --dry-run               show what would be created, change nothing
+      --secrets-stdin         read passwords as JSON from stdin: {"glowroot_password": "..."}
+  -h, --help                  this help
+With -y these are required: <instance>; -V, -f or -l (or --no-deploy with --line); -g; -m when Munin is installed;
+the Glowroot password (in --secrets-stdin) when it is needed. Exit codes: 0 ok, 1 failure, 3 missing input.
+EOF
   exit "${1:-1}"
 }
 
+NODEPLOY=false
+LINE_OPT=""
+V_OPT=""
+FILE=""
+URL=""
+SHA_OPT=""
+BASED_ON=""
 GLOWROOT=""
 MUNIN=""
 GR_USER_OPT=""
-V_OPT=""
-PASSWORD_STDIN=false
+IP_OPT=""
+PG_OPT=""
+CREATEDB=true
+SECRETS_STDIN=false
 ARGS=()
 while [[ $# -gt 0 ]]; do
   case $1 in
-    -n) CREATEDB=false ;;
-    -V) V_OPT=$2; shift ;;
-    -g) GLOWROOT=$2; shift
-        [[ $GLOWROOT =~ ^(yes|no)$ ]] || usage ;;
-    -m) MUNIN=$2; shift
-        [[ $MUNIN =~ ^(yes|no)$ ]] || usage ;;
-    -U) GR_USER_OPT=$2; shift ;;
-    --password-stdin) PASSWORD_STDIN=true ;;
+    -V|--release) V_OPT=$2; shift ;;
+    -f|--file) FILE=$2; shift ;;
+    -l|--url) URL=$2; shift ;;
+    --sha256) SHA_OPT=$2; shift ;;
+    --based-on) BASED_ON=$2; shift ;;
+    --no-deploy) NODEPLOY=true ;;
+    --line) LINE_OPT=$2; shift ;;
+    -g|--glowroot) GLOWROOT=$2; shift
+        [[ $GLOWROOT =~ ^(yes|no)$ ]] || die "-g/--glowroot takes yes or no" ;;
+    -m|--munin) MUNIN=$2; shift
+        [[ $MUNIN =~ ^(yes|no)$ ]] || die "-m/--munin takes yes or no" ;;
+    -U|--glowroot-user) GR_USER_OPT=$2; shift ;;
+    --ip) IP_OPT=$2; shift ;;
+    --postgres) PG_OPT=$2; shift ;;
+    -n|--no-database) CREATEDB=false ;;
+    -y|--yes) YES=true ;;
+    --dry-run) DRY_RUN=true ;;
+    --secrets-stdin) SECRETS_STDIN=true ;;
     -h|--help) usage 0 ;;
-    -*) die "unknown option $1" ;;
+    -*) die "unknown option $1 (see $PROG --help)" ;;
     *) ARGS+=("$1") ;;
   esac
   shift
 done
-set -- "${ARGS[@]}"
 
-if [ "$#" -lt 1 ]; then
-  usage
+[[ $EUID -eq 0 ]] || die "please run with sudo"
+N=0
+for X in "$V_OPT" "$FILE" "$URL"; do [[ -n $X ]] && N=$((N + 1)); done
+(( N <= 1 )) || die "use only one of -V, -f and -l"
+[[ $NODEPLOY == false || $N -eq 0 ]] || die "--no-deploy can't be combined with -V, -f or -l"
+[[ -z $LINE_OPT || $NODEPLOY == true ]] || die "--line is only for --no-deploy (otherwise the release decides the version)"
+[[ -z $BASED_ON$SHA_OPT || -n $FILE$URL ]] || die "--based-on and --sha256 are only for an own war (-f or -l)"
+[[ $SECRETS_STDIN == false ]] || secrets_load glowroot_password
+
+NAME=${ARGS[0]-}
+[[ -n $NAME ]] || ask NAME "Instance name" "" "<instance>"
+WARDIR=$(mktemp -d -p /var/tmp dhis2-war.XXXXXX)
+trap 'rm -rf "$WARDIR"' EXIT
+
+###############################################################
+# What to deploy. The version decides Ubuntu, Tomcat and Java.
+
+feed_load
+if [[ $NODEPLOY == false && $N -eq 0 ]] && interactive; then
+  echo "What do you want to do?" >&2
+  echo "  1) Create the instance and deploy DHIS2" >&2
+  echo "  2) Create the instance only (deploy DHIS2 later with dhis2-deploy-war)" >&2
+  read -r -p "Choice [1]: " CHOICE
+  [[ ${CHOICE:-1} == 2 ]] && NODEPLOY=true
 fi
 
-NAME=$1
+# check_line LINE: a DHIS2 version these tools install (2.38 or newer, in the release list)
+check_line() {
+  [[ $1 =~ ^2\.[0-9]+$ ]] && (( ${1#2.} >= OLDEST_LINE )) && [[ -n $(feed_line_jdk "$1") ]] \
+    || die "$1 is not a DHIS2 version these tools install (2.$OLDEST_LINE or newer, e.g. 2.42)"
+}
+
+SOURCE=""
+RELEASE=""
+LINE=""
+WARFILE=""
+if [[ $NODEPLOY == true ]]; then
+  SOURCE=none
+  RELEASE=none
+  LINE=$LINE_OPT
+  if [[ -z $LINE ]] && interactive; then
+    echo "Which DHIS2 version will $NAME run? (it decides Ubuntu, Tomcat and Java)" >&2
+    feed_show | awk '{print "  " $1 "  " $2 " " $3}' | sed 's/ 2\.[0-9.]*$//' >&2
+    ask LINE "Version" "$(release_line "$(feed_newest)")"
+  fi
+  require "$LINE" "--line <version>" "the DHIS2 version it will run (e.g. 2.42)"
+else
+  if [[ $N -eq 0 ]] && interactive; then
+    echo "Where does DHIS2 come from?" >&2
+    echo "  1) An official release (checked against its published checksum)" >&2
+    echo "  2) My own war file on this server" >&2
+    echo "  3) My own war at a URL" >&2
+    read -r -p "Choice [1]: " CHOICE
+    case ${CHOICE:-1} in
+      2) until [[ -f $FILE ]]; do ask FILE "Path of the war file"; done ;;
+      3) ask URL "URL of the war file" ;;
+    esac
+  fi
+  if [[ -n $FILE || -n $URL ]]; then
+    SOURCE=custom
+    if [[ -n $URL ]]; then
+      echo "Downloading $URL" >&2
+      curl -fL --progress-bar -o "$WARDIR/dhis.war" "$URL" || die "download failed: $URL"
+      WARFILE=$WARDIR/dhis.war
+    else
+      [[ -f $FILE ]] || die "no such file: $FILE"
+      WARFILE=$FILE
+    fi
+    unzip -tqq "$WARFILE" >/dev/null 2>&1 || die "not a valid war file: ${FILE:-$URL}"
+    if [[ -n $SHA_OPT ]]; then
+      [[ $(sha256sum "$WARFILE" | cut -d' ' -f1) == "$SHA_OPT" ]] || die "the war does not match --sha256; nothing was created"
+    fi
+    RELEASE=$(war_release "$WARFILE")
+    if [[ -n $RELEASE ]]; then
+      LINE=$(release_line "$RELEASE")
+    else
+      LINE=$BASED_ON
+      if [[ -z $LINE ]] && interactive; then
+        echo "The DHIS2 version can't be read from this war." >&2
+        ask LINE "Which DHIS2 version is it built on (e.g. 2.41)"
+      fi
+      require "$LINE" "--based-on <version>" "the DHIS2 version the war is built on (it can't be read from the war)"
+      RELEASE=custom
+    fi
+  else
+    SOURCE=official
+    if ask_release RELEASE "" "" "$V_OPT"; then
+      LINE=$REL_LINE
+    fi
+  fi
+fi
+
+###############################################################
+# Monitoring
+
+if [[ -z $GLOWROOT ]]; then
+  if interactive; then
+    [[ $APM == glowroot ]] && DEFAULT=y || DEFAULT=n
+    ask_yes_no "Install Glowroot on $NAME?" $DEFAULT && GLOWROOT=yes || GLOWROOT=no
+  else
+    require "" "-g/--glowroot yes|no" "install Glowroot"
+  fi
+fi
+if [[ $MONITORING != munin ]]; then
+  MUNIN=no
+elif [[ -z $MUNIN ]]; then
+  if interactive; then
+    ask_yes_no "Monitor $NAME with Munin?" y && MUNIN=yes || MUNIN=no
+  else
+    require "" "-m/--munin yes|no" "monitor with Munin"
+  fi
+fi
+SAVE_SHARED=false
+if [[ $GLOWROOT == yes ]]; then
+  if [[ $GLOWROOT_LOGIN == shared ]]; then
+    if ! glowroot_load_shared; then
+      interactive && echo "Set the shared Glowroot login, used by every instance on this server" >&2
+      glowroot_new_login "$GR_USER_OPT" glowroot_password
+      SAVE_SHARED=true   # saved only after the summary is confirmed
+    fi
+  else
+    interactive && echo "Glowroot login for $NAME" >&2
+    glowroot_new_login "$GR_USER_OPT" glowroot_password
+  fi
+fi
+
+check_missing
+
+# checks that need the name: container, IP, database
+[[ $NAME =~ ^[a-z][a-z0-9-]{0,62}$ && $NAME != *- ]] \
+  || die "instance names use lowercase letters, digits and '-', start with a letter, and are at most 63 characters"
 
 NETPREFIX=$(ip addr | awk '/inet.*lxdbr0/ {print $2}'|grep -o -e '^[0-9]*.[0-9]*.[0-9]*')
 # configured (not just running) addresses, so stopped containers keep their IP
@@ -76,102 +236,73 @@ for N in {10..19}; do
   grep -qx "${NETPREFIX}.${N}" <<< "$USED" || { FREEIP="${NETPREFIX}.${N}"; break; }
 done
 
-IP=${2:-${FREEIP}}
-PG=${3:-postgres}
-
-if [[ -z $IP ]]; then
-  echo "No free IP in ${NETPREFIX}.10-19, please give one explicitly"
-  exit 1
-fi
+IP=${IP_OPT:-${ARGS[1]:-$FREEIP}}
+PG=${PG_OPT:-${ARGS[2]:-postgres}}
+[[ -n $IP ]] || die "no free IP in ${NETPREFIX}.10-19: give one with --ip"
 
 # convert IP to regex
 IPREGEX=$(echo $IP |sed "s/\./\\\./g")
 
-# check Container name is available
-if lxc info "$NAME" >/dev/null 2>&1;
-then 
-  echo Container $1 already exists;
-  exit 1  
+lxc info "$NAME" >/dev/null 2>&1 && die "container $NAME already exists"
+grep -qx "$IP" <<< "$USED" && die "$IP is already in use"
+
+if [[ $CREATEDB == true ]]; then
+  lxc info "$PG" >/dev/null 2>&1 || die "no such container: $PG"
+  PGVERSION=$(lxc exec $PG -- psql -t -c 'select version()' postgres |awk '/PostgreSQL/ {print $2}')
+  [[ -n $PGVERSION ]] || die "can't connect to a postgres server on $PG"
+  PGMAJOR=$(echo $PGVERSION |cut -d. -f 1)
+  lxc exec $PG -- psql -lqt --csv |cut -d ',' -f 1 |grep -qx "$NAME" && die "database $NAME already exists on $PG"
+  lxc exec $PG -- psql --csv -qt -c '\du' postgres |cut -d, -f1 |grep -qx "$NAME" && die "database user $NAME already exists on $PG"
 fi
 
-# Check IP is available
-if grep -qx "$IP" <<< "$USED";
-then
-  echo "$IP already in use"
-  exit 1
-fi
-
-# Monitoring choices, asked before anything is created
-if [[ -z $GLOWROOT ]]; then
-  [[ $APM == glowroot ]] && DEFAULT=y || DEFAULT=n
-  ask_yes_no "Install Glowroot on $NAME?" $DEFAULT && GLOWROOT=yes || GLOWROOT=no
-fi
-if [[ $MONITORING != munin ]]; then
-  MUNIN=no
-elif [[ -z $MUNIN ]]; then
-  ask_yes_no "Monitor $NAME with Munin?" y && MUNIN=yes || MUNIN=no
-fi
-if [[ $GLOWROOT == yes ]]; then
-  if [[ $GLOWROOT_LOGIN == shared ]]; then
-    if ! glowroot_load_shared; then
-      [[ -t 0 || $PASSWORD_STDIN == true ]] || die "there is no shared Glowroot login yet: set it with dhis2-glowroot-login"
-      echo "Set the shared Glowroot login, used by every instance on this server"
-      glowroot_new_login "$GR_USER_OPT" $PASSWORD_STDIN
-      glowroot_save_shared
-    fi
-  else
-    echo "Glowroot login for $NAME"
-    glowroot_new_login "$GR_USER_OPT" $PASSWORD_STDIN
-  fi
-fi
-
-# DHIS2 release: it decides the container OS, tomcat and java.
-# The war is downloaded and checked before anything is created.
-feed_load
-ask_release RELEASE "" "" "$V_OPT"
-TOMCAT=$(tomcat_for_line "$REL_LINE")
+[[ -z $LINE ]] || check_line "$LINE"
+JAVA_VERSION=$(feed_line_jdk "$LINE")
+TOMCAT=$(tomcat_for_line "$LINE")
 GUESTOS=$(guestos_for_tomcat "$TOMCAT")
-JAVA_VERSION=$REL_JDK
 if [[ $TOMCAT == tomcat10 ]] && ! grep -q TOMCAT $TOMCAT_SETUP; then
   die "$TOMCAT_SETUP is from an older version: run sudo dhis2-upgrade-setup first"
 fi
-WARDIR=$(mktemp -d -p /var/tmp dhis2-war.XXXXXX)
-trap 'rm -rf "$WARDIR"' EXIT
-download_war "$WARDIR" || die "could not get a verified download of DHIS2 $RELEASE; nothing was created"
-echo "$NAME: DHIS2 $RELEASE on $TOMCAT, Java $JAVA_VERSION, Ubuntu $GUESTOS"
+
+###############################################################
+# Summary, then the checked download of an official release (another release can be chosen if it fails)
+
+show_summary() {
+  SUMMARY=()
+  summary Instance "$NAME ($IP)"
+  if [[ $CREATEDB == true ]]; then summary Database "$NAME on $PG"; else summary Database "none (-n)"; fi
+  case $SOURCE in
+    none)     summary DHIS2 "not deployed now (DHIS2 $LINE; deploy later with dhis2-deploy-war)" ;;
+    official) summary DHIS2 "$RELEASE (official release; checked against its published checksum)" ;;
+    custom)   summary DHIS2 "$RELEASE (own war ${FILE:-$URL}; ${SHA_OPT:+checksum matches --sha256}${SHA_OPT:-no published checksum})" ;;
+  esac
+  summary "Runs on" "Ubuntu $GUESTOS, $TOMCAT, Java $JAVA_VERSION"
+  if [[ $GLOWROOT == yes ]]; then summary Glowroot "yes ($GLOWROOT_LOGIN login, user $GR_USER)"; else summary Glowroot no; fi
+  summary Munin "$MUNIN"
+  confirm_summary "Create $NAME?"
+}
+show_summary
+
+if [[ $SOURCE == official ]]; then
+  while true; do
+    download_war "$WARDIR"
+    case $? in
+      0) break ;;
+      2) ask_release RELEASE "" "" ""
+         LINE=$REL_LINE
+         JAVA_VERSION=$(feed_line_jdk "$LINE")
+         TOMCAT=$(tomcat_for_line "$LINE")
+         GUESTOS=$(guestos_for_tomcat "$TOMCAT")
+         show_summary ;;
+      *) die "could not get a verified download of DHIS2 $RELEASE; nothing was created" ;;
+    esac
+  done
+  WARFILE=$WARDIR/dhis.war
+fi
+echo "$NAME: ${RELEASE/#none/no DHIS2 yet,} $TOMCAT, Java $JAVA_VERSION, Ubuntu $GUESTOS"
+[[ $SAVE_SHARED == false ]] || glowroot_save_shared
 
 if [[ $CREATEDB == true ]]
 then
-
-  # Check if Postgres container exists
-  if ! lxc info "$PG" >/dev/null 2>&1;
-  then
-    echo No such container $PG;
-    exit 1
-  fi
-
-  # Check postgres version
-  PGVERSION=$(lxc exec $PG -- psql -t -c 'select version()' postgres |awk '/PostgreSQL/ {print $2}')
-  if [ -z $PGVERSION ] 
-  then
-    echo "Cant connect to a postgres server on $PG"
-    exit 1
-  fi
-  PGMAJOR=$(echo $PGVERSION |cut -d. -f 1)
-
-  # Check if database already exists
-  if lxc exec $PG -- psql -lqt --csv |cut -d ',' -f 1 |grep -qx "$NAME"
-  then
-    echo "Database $NAME already exists"
-    exit 1
-  fi
-
-  # Check if database user already exists
-  if lxc exec $PG -- psql --csv -qt -c '\du' postgres |cut -d, -f1 |grep -qx "$NAME"
-  then
-    echo "User $NAME already exists"
-    exit 1
-  fi
   echo "########################################"
   echo "Creating database $NAME on $PG"
   echo "########################################"
@@ -208,6 +339,8 @@ sudo lxc config device set $NAME eth0 ipv4.address $IP
 lxc config set $NAME user.type "Tomcat server"
 lxc config set $NAME user.dhis2.tomcat $TOMCAT
 lxc config set $NAME user.dhis2.java $JAVA_VERSION
+lxc config set $NAME user.dhis2.line $LINE
+lxc config set $NAME user.dhis2.source $SOURCE
 lxc start $NAME 
 
 # wait for network to come up
@@ -257,8 +390,13 @@ if [[ $MUNIN == yes ]]; then
 fi
 lxc config set $NAME user.dhis2.munin $MUNIN
 
-# deploy the checked war and start tomcat
-deploy_war $NAME "$WARDIR/dhis.war" "$RELEASE"
+# deploy the war and start tomcat (create only: start tomcat without DHIS2)
+if [[ $SOURCE == none ]]; then
+  lxc config set $NAME user.dhis2.version none
+  lxc exec $NAME -- service $TOMCAT restart
+else
+  deploy_war $NAME "$WARFILE" "$RELEASE"
+fi
 
 # Append to bottom /etc/hosts
 sudo sed -i "/$IP/d" /etc/hosts
@@ -367,4 +505,8 @@ else
   exit 1
 fi
 
-echo "$NAME: DHIS2 $RELEASE is starting at $(server_base_url)/$NAME (the first start takes a few minutes)"
+if [[ $SOURCE == none ]]; then
+  echo "$NAME is ready for DHIS2 $LINE: deploy it with: sudo dhis2-deploy-war $NAME"
+else
+  echo "$NAME: DHIS2 $RELEASE is starting at $(server_base_url)/$NAME (the first start takes a few minutes)"
+fi

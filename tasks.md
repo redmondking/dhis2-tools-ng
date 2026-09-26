@@ -70,6 +70,10 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
     - `dhis2-list-instances` and `--json`
     - `dhis2-upgrade-setup` labels on an instance made with the original scripts
     - Glowroot on Tomcat 10
+  - phase 3b:
+    - `dhis2-create-instance` interactively: the create/deploy menu, the source menu, own war file and URL, `--based-on`,
+      create only (`--line`), summary and "Create it?"; checksum failure menu with "choose another release"
+    - `dhis2-create-instance -y` from a script with `--secrets-stdin`, and `--dry-run` (nothing created)
 - [ ] 1.4 Merge `develop` into `master` and push
 
 ## Phase 2 – Install/update, lock down monitoring, modernise the base
@@ -147,7 +151,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 
 - [~] 3b.1 Shared helpers: `need_flags` (collect every missing flag, then one error with exit 3), a summary/confirm helper,
       `--secrets-stdin` reader (JSON object on stdin, keys like `glowroot_password`; see `architecture.md` section 12), and "no terminal: add -y" (exit 3)
-- [ ] 3b.2 `dhis2-create-instance`:
+- [~] 3b.2 `dhis2-create-instance` (also 3b.15 and 3b.16 for this command):
   - first question: 1) create and deploy DHIS2 2) create only (`--no-deploy`); create only asks the version line (`--line 2.42`)
     to choose Ubuntu/Tomcat/Java
   - "where does DHIS2 come from": 1) official release (`-V`) 2) own war file (`-f`) 3) own war at a URL (`-l`)

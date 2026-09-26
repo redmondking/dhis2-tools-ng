@@ -125,7 +125,8 @@ All state about an instance lives on its container:
 | `user.dhis2.version` | exact release, `none`, or `custom` | create-instance, deploy-war |
 | `user.dhis2.tomcat` | `tomcat9` / `tomcat10` (missing = `tomcat9`) | create-instance |
 | `user.dhis2.java` | `11`, `17`, ... | create-instance |
-| `user.dhis2.source` | `official` / `custom` | [planned, 3b] |
+| `user.dhis2.source` | `official` / `custom` / `none` (created without DHIS2) | create-instance, deploy-war |
+| `user.dhis2.line` | the DHIS2 version line, e.g. `2.42` (so create-only instances know which releases fit) | create-instance, deploy-war |
 | `user.dhis2.glowroot` | `shared` / `own` / `off` | create-instance, `dhis2-glowroot-login` |
 | `user.dhis2.glowroot.user` | the Glowroot username managed by the tools | same |
 | `user.dhis2.munin` | `yes` / `no` | create-instance |
@@ -326,6 +327,8 @@ overwritten and may hold local edits, so only known lines are patched). It is sa
 - 2026-09-26: create-instance asks create-and-deploy vs create-only, shows a summary to confirm; own wars supported.
 - 2026-09-26: restoring after deploying (stop, restore, start) instead of a "restore before first start".
 - 2026-09-26: `--install-key no` for remotes; new `dhis2-list-backups`; `dhis2-upgrade-setup` takes passwords via `--secrets-stdin`.
+- 2026-09-26 (phase 3b plan): labels `user.dhis2.line` (create-only instances need it) and `user.dhis2.source`; `dhis2-upgrade-setup`
+  takes per-instance Glowroot passwords as `glowroot_passwords` = `{"<instance>": "…"}` in `--secrets-stdin` (own mode).
 - 2026-09-26 (phase 3b): create-only asks the version line (`--line`); `dhis2-restoredb` stops the instance's Tomcat, restores and
   starts it again when the database belongs to an instance; every short flag gets a long name; 3b order: helpers, create-instance
   and deploy-war, the security fixes (logview, ssl-setup), then the rest, one commit per command.
