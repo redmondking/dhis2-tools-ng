@@ -7,28 +7,44 @@
 #
 #   Show non-idle database connections
 
-PROG=`basename $0`
+PROG=$(basename "$0")
+# shellcheck source=../lib/dhis2-lib.sh
+source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
 
-###############################################################
 usage() {
-  echo "Usage: $PROG [<postgres_container>]"
-  echo "  postgres_container: name of the postgres container"
-  echo "Options:"
-  echo "  -h, --help       Display this help message"
+  cat <<EOF
+Usage: $PROG [options] [<postgres_container>]
+Options:
+      --postgres <container>  postgres container (default: postgres)
+      --json                  output a JSON array: transaction_seconds, query_seconds, database, state, query
+  -h, --help                  this help
+EOF
+  exit "${1:-1}"
 }
 
-while getopts h opt
-do
-  case $opt in
-    h) usage; exit 1;;
-    *) echo "Error: Unknown parameter '$OPTARG'."
-        exit 1;;
+PG=""
+JSON=false
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --postgres) PG=${2-}; shift ;;
+    --json) JSON=true ;;
+    -h|--help) usage 0 ;;
+    -*) die "unknown option $1 (see $PROG --help)" ;;
+    *) [[ -z $PG ]] || die "one postgres container at a time"; PG=$1 ;;
   esac
+  shift
 done
-shift $(($OPTIND - 1))
+PG=${PG:-postgres}
+lxc info "$PG" >/dev/null 2>&1 || die "no such container: $PG"
 
-DBCONTAINER=${1:-postgres}
-
-Q="SELECT now()-xact_start,now()-query_start,datname,state,query from pg_stat_activity WHERE state != 'idle' AND datname != 'postgres' ORDER BY now()-xact_start DESC;"
-
-echo $Q | lxc exec $DBCONTAINER -- psql -t postgres
+WHERE="state != 'idle' AND datname != 'postgres'"
+if [[ $JSON == true ]]; then
+  lxc exec "$PG" -- psql -tA -c "SELECT coalesce(json_agg(a), '[]') FROM (
+    SELECT extract(epoch FROM now() - xact_start)::int AS transaction_seconds,
+           extract(epoch FROM now() - query_start)::int AS query_seconds,
+           datname AS database, state, query
+    FROM pg_stat_activity WHERE $WHERE ORDER BY now() - xact_start DESC NULLS LAST) a" postgres
+else
+  lxc exec "$PG" -- psql -c "SELECT now() - xact_start AS transaction, now() - query_start AS query_time,
+    datname AS database, state, query FROM pg_stat_activity WHERE $WHERE ORDER BY now() - xact_start DESC NULLS LAST" postgres
+fi

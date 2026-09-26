@@ -179,7 +179,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [~] 3b.5 `dhis2-restoredb` (also: a failure anywhere in the restore pipe now fails the command; the dump is checked with `gzip -t` first): summary; when the database belongs to an instance, stop its Tomcat, restore, start it again
       (shown in the summary); `--dry-run`, `--postgres` (no longer hardcoded; from phase 6 the default comes from the instance's
       `user.dhis2.postgres` label), "add -y" without a terminal
-- [ ] 3b.6 `dhis2-dbactivity --json`, `--postgres`
+- [~] 3b.6 `dhis2-dbactivity --json`, `--postgres`
 - [~] 3b.7 `dhis2-logview`: **security fix**. The `-g` text currently goes through a shell as root in the container.
       Run `journalctl` with an argument list instead. Fix `-f`/`-r` (they swallow the next argument). Add `--json` (journalctl `-o json`)
 - [ ] 3b.8 `dhis2-backup`: exit non-zero when any backup fails (today it always exits 0), `--dry-run`
