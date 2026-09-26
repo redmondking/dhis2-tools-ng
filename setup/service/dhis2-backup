@@ -8,7 +8,29 @@
 # http://wiki.postgresql.org/wiki/Automated_Backup_on_Linux
 ########################################################
 
+case ${1-} in
+  --dry-run) DRY_RUN=true ;;
+  -h|--help) echo "Usage: $(basename "$0") [--dry-run]"
+             echo "  Backs up the databases listed in /usr/local/etc/dhis/dhis2-env. Exits 1 if any backup or the remote copy failed."
+             echo "  --dry-run  show what would be backed up, change nothing"
+             exit 0 ;;
+  "") DRY_RUN=false ;;
+  *) echo "Error: unknown option $1" >&2; exit 1 ;;
+esac
+
 source /usr/local/etc/dhis/dhis2-env
+FAILED=0   # a failed database or remote copy makes the run exit 1
+set -o pipefail   # a failed pg_dump must count, not just the gzip after it
+
+if [[ $DRY_RUN == true ]]; then
+  echo "Backup folder:        $BACKUP_DIR"
+  echo "Today's backups:      daily$( [[ $(date +%u) == "$DAY_OF_WEEK_TO_KEEP" ]] && echo ", weekly")$( [[ $(date +%d) == 01 ]] && echo ", monthly")"
+  echo "Plain databases:      ${PLAIN_BACKUPS:-none}"
+  echo "Encrypted databases:  ${ENCRYPTED_BACKUPS:-none}"
+  echo "Remote copy:          ${REMOTE:-none}"
+  echo "Dry run: nothing changed."
+  exit 0
+fi
 
 function perform_backups()
 {
@@ -25,6 +47,7 @@ function perform_backups()
   do
      if ! lxc exec postgres -- pg_dump -O -Fp $DBNAME $EXCLUDED | gzip > $FINAL_BACKUP_DIR"$DBNAME".sql.gz.in_progress; then
         echo "`date` [!!ERROR!!] Failed to produce plain backup of database $DBNAME"
+        FAILED=$((FAILED + 1))
      else
         mv $FINAL_BACKUP_DIR"$DBNAME".sql.gz.in_progress $FINAL_BACKUP_DIR"$DBNAME".sql.gz
      fi
@@ -33,7 +56,8 @@ function perform_backups()
  for DBNAME in $ENCRYPTED_BACKUPS
   do
      if ! lxc exec postgres -- pg_dump -O -Fp $DBNAME $EXCLUDED | gzip | openssl $CIPHER -e -pass file:$PASSWORD_FILE -salt > $FINAL_BACKUP_DIR"$DBNAME".sql.gz.enc.in_progress; then
-        echo "`date` [!!ERROR!!] Failed to produce plain backup of database $DBNAME"
+        echo "`date` [!!ERROR!!] Failed to produce encrypted backup of database $DBNAME"
+        FAILED=$((FAILED + 1))
      else
         mv $FINAL_BACKUP_DIR"$DBNAME".sql.gz.enc.in_progress $FINAL_BACKUP_DIR"$DBNAME".sql.gz.enc
      fi
@@ -41,7 +65,10 @@ function perform_backups()
 
   # if a remote backup machine is defined, rsynch to it
   if [ -n "$REMOTE" ]; then
-    rsync -avq $BACKUP_DIR/* $REMOTE
+    if ! rsync -avq $BACKUP_DIR/* $REMOTE; then
+      echo "`date` [!!ERROR!!] Failed to copy the backups to $REMOTE"
+      FAILED=$((FAILED + 1))
+    fi
   fi
 
 
@@ -74,3 +101,8 @@ fi
 find $BACKUP_DIR -maxdepth 1 -mtime +$DAYS_TO_KEEP -name "*-daily" -exec rm -rf '{}' ';'
  
 perform_backups "-daily"
+
+if [[ $FAILED -gt 0 ]]; then
+  echo "`date` $FAILED backup step(s) failed" >&2
+  exit 1
+fi

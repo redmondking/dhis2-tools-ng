@@ -182,7 +182,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [~] 3b.6 `dhis2-dbactivity --json`, `--postgres`
 - [~] 3b.7 `dhis2-logview`: **security fix**. The `-g` text currently goes through a shell as root in the container.
       Run `journalctl` with an argument list instead. Fix `-f`/`-r` (they swallow the next argument). Add `--json` (journalctl `-o json`)
-- [ ] 3b.8 `dhis2-backup`: exit non-zero when any backup fails (today it always exits 0), `--dry-run`
+- [~] 3b.8 `dhis2-backup`: exit non-zero when any backup fails (today it always exits 0: only `gzip` after `pg_dump` counted), `--dry-run`
 - [~] 3b.9 `dhis2-ssl-setup`:
   - `-y`, `--renew yes|no`, `--dry-run` (certbot's `--dry-run` against the Let's Encrypt test server)
   - **fix:** without a terminal it currently skips its "are you sure?" menu and requests the certificate
