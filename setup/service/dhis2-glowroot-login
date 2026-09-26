@@ -70,7 +70,7 @@ echo "Glowroot reads its login at startup, so the new login works after tomcat r
 if [[ $YES == true ]] || ask_yes_no "Restart tomcat on ${AFFECTED[*]} now? DHIS2 will be down for a few minutes" n; then
   for C in "${AFFECTED[@]}"; do
     echo "Restarting $C"
-    lxc exec "$C" -- service tomcat9 restart
+    lxc exec "$C" -- service "$(instance_tomcat "$C")" restart
   done
 else
   echo "Not restarted: the old login stays in use until the next restart"

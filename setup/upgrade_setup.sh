@@ -71,10 +71,11 @@ for ROW in $(lxc list -c ns --format csv); do
     echo "$C: skipped (not running), start it and re-run to check it"
     continue
   fi
-  lxc exec "$C" -- grep -q '^JAVA_HOME=.*{{' /etc/default/tomcat9 2>/dev/null || { echo "$C: ok"; continue; }
+  T=$(instance_tomcat "$C")
+  lxc exec "$C" -- grep -q '^JAVA_HOME=.*{{' /etc/default/$T 2>/dev/null || { echo "$C: ok"; continue; }
   JH=$(lxc exec "$C" -- sh -c 'dirname "$(dirname "$(readlink -f "$(command -v java)")")"')
   echo "$C: JAVA_HOME is broken, setting it to $JH"
-  lxc exec "$C" -- sed -i "s|^JAVA_HOME=.*|JAVA_HOME=\"$JH/\"|" /etc/default/tomcat9
+  lxc exec "$C" -- sed -i "s|^JAVA_HOME=.*|JAVA_HOME=\"$JH/\"|" /etc/default/$T
   RESTART+=("$C")
 done
 
@@ -220,9 +221,11 @@ echo
 echo "== 9. Template fixes in /usr/local/etc/dhis"
 # templates are copied once and may hold local edits, so only the known lines are patched
 TS=/usr/local/etc/dhis/tomcat_setup
-if [[ -f $TS ]] && grep -q -e '^echo "tomcat" >> /at.deny' -e '^ufw enable' $TS; then
-  sed -i -e 's|^echo "tomcat" >> /at.deny|echo "tomcat" >> /etc/at.deny|' -e 's|^ufw enable|ufw --force enable|' $TS
-  echo "Fixed tomcat_setup (at.deny path, non-interactive ufw)"
+if [[ -f $TS ]] && grep -q -e '^echo "tomcat" >> /at.deny' -e '^ufw enable' -e 'tomcat9' $TS; then
+  # tomcat9 -> TOMCAT placeholder: new instances get tomcat9 or tomcat10 depending on the DHIS2 version
+  sed -i -e 's|^echo "tomcat" >> /at.deny|echo "tomcat" >> /etc/at.deny|' -e 's|^ufw enable|ufw --force enable|' \
+         -e 's|tomcat9|TOMCAT|g' $TS
+  echo "Fixed tomcat_setup (at.deny path, non-interactive ufw, tomcat9 or tomcat10 per instance)"
 else
   echo "Nothing to fix"
 fi
@@ -233,7 +236,7 @@ if [[ ${#RESTART[@]} -gt 0 ]]; then
   echo "== Restarts"
   for C in $(printf '%s\n' "${RESTART[@]}" | sort -u); do
     if confirm "$C: restart tomcat now so the fixes take effect (DHIS2 will be down for a few minutes)?" n; then
-      lxc exec "$C" -- service tomcat9 restart
+      lxc exec "$C" -- service "$(instance_tomcat "$C")" restart
     elif [[ " ${GLOWROOT_PENDING[*]} " == *" $C "* ]]; then
       echo "WARNING: $C: Glowroot stays open to anyone until tomcat restarts"
     else

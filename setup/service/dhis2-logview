@@ -8,6 +8,7 @@
 #   Script to view dhis2 tomcat log
 
 PROG=`basename $0`
+source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
 
 ###############################################################
 usage() {
@@ -53,6 +54,6 @@ done
 
 NAME=$1
 
-JCMD="journalctl -u tomcat9 $SINCE $UNTIL $FOLLOW $REVERSE $GREP"
+JCMD="journalctl -u $(instance_tomcat $NAME) $SINCE $UNTIL $FOLLOW $REVERSE $GREP"
 echo $JCMD
 echo $JCMD | lxc exec $NAME -- sh
