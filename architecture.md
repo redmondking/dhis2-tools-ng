@@ -302,9 +302,11 @@ screens, exit code 3 for "needs more answers".
 
 `dhis2-upgrade-setup` repairs and migrates servers installed with the original scripts, and `dhis2-tools-update` runs it after
 every update. **Every change to installed state or to an `etc/*` template ships with a step there** (templates are never
-overwritten and may hold local edits, so only known lines are patched). It is safe to re-run. Without a terminal it behaves as
-`-y`; the password steps then need `--secrets-stdin` (phase 3b). Tomcat restarts are collected and asked once at the end
-(default no).
+overwritten and may hold local edits, so only known lines are patched). It is safe to re-run, and `--dry-run` reports what each
+step would change without changing anything. Without a terminal it behaves as `-y`; the password steps then use
+`--secrets-stdin` (`munin_password`, `glowroot_password`, `glowroot_passwords` per instance) or are skipped with a warning.
+Its questions have flags: `--renew`, `--glowroot-login`, `--glowroot-user`, `--munin-user`, `--restart`. Tomcat restarts are
+collected and done only with `--restart yes` or a yes at the end (default no).
 
 ## 15. Decisions log
 

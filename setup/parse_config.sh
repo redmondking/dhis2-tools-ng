@@ -1,5 +1,6 @@
 # Parse the contents of containers.json into bash variables
-CONFIG=$(cat /usr/local/etc/dhis/containers.json)
+# (DHIS2_CONF: another copy to read, used by dhis2-upgrade-setup --dry-run)
+CONFIG=$(cat "${DHIS2_CONF:-/usr/local/etc/dhis/containers.json}")
 
 # Abort script on errors
 #set -o errexit
