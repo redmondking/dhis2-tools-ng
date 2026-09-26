@@ -1,39 +1,76 @@
 #!/usr/bin/env bash
 #
 #   Get a letsencrypt certificate for the fqdn and switch the proxy to https.
-#   Usage: sudo dhis2-ssl-setup
+#   Usage: sudo dhis2-ssl-setup [options]   (see --help)
 
 cd "$(dirname "$(readlink -f "$0")")" || exit 1
+# shellcheck source=lib/dhis2-lib.sh
+source lib/dhis2-lib.sh
+
+usage() {
+  cat <<EOF
+Usage: dhis2-ssl-setup [options]
+Gets a Let's Encrypt certificate for the fqdn in containers.json and switches the proxy to https.
+Options:
+      --renew yes|no  renew the certificate automatically (default yes)
+      --dry-run       test with Let's Encrypt's staging server: checks DNS and port 80 without a real certificate
+                      and without using up the real request limits; changes nothing (the proxy stops for a few seconds)
+  -y, --yes           ask nothing
+  -h, --help          this help
+Exit codes: 0 ok, 1 failure, 3 missing input (e.g. no terminal to confirm: add -y).
+EOF
+  exit "${1:-1}"
+}
+
+RENEW=""
+TEST=false
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --renew) RENEW=${2-}; shift
+        [[ $RENEW =~ ^(yes|no)$ ]] || die "--renew takes yes or no" ;;
+    --dry-run) TEST=true ;;
+    -y|--yes) YES=true ;;
+    -h|--help) usage 0 ;;
+    *) die "unknown option $1 (see dhis2-ssl-setup --help)" ;;
+  esac
+  shift
+done
+[[ $EUID -eq 0 ]] || die "please run with sudo"
 
 # Parse json config file
 source parse_config.sh
 
-echo "IMPORTANT WARNING"
-echo "================="
-echo "You are about to attempt to setup a TLS certificate from"
-echo "letsencrypt.org for $FQDN.  Please first check that you"
-echo "can reach http://$FQDN from your browser.  If you cannot"
-echo "reach it then there is some problem with your setup.  It could"
-echo "be:"
-echo "1. failure to resolve DNS"
-echo "2. external or host based firewall issue"
-echo "3. proxy service is not running"
-echo "If you cannot access, then do not proceed.  Exit now and resolve"
-echo "the issue before trying again.  If you make too many failed"
-echo "requests to run this script you will be banned by letsencrypt."
-echo
-echo "Are you really sure you want to install ssl certificate now?"
-select yn in "Yes" "No"; do
-    case $yn in
-        Yes ) break;;
-        No ) exit;;
-    esac
-done
+if [[ -z $RENEW ]]; then
+  if [[ $TEST == false ]] && interactive; then
+    echo "Letsencrypt certificates expire after 90 days." >&2
+    ask_yes_no "Renew the certificate automatically?" y && RENEW=yes || RENEW=no
+  else
+    RENEW=yes
+  fi
+fi
+[[ $RENEW == yes ]] && RENEWAL=enable || RENEWAL=disable
 
-echo
-echo "Letsencrypt certificates expire after 90 days."
-read -r -p "Renew the certificate automatically? [Y/n] " ANSWER
-[[ $ANSWER =~ ^[Nn] ]] && RENEWAL=disable || RENEWAL=enable
+summary Domain "$FQDN"
+summary Email "$EMAIL"
+summary Proxy "$PROXY in the proxy container (it stops for a few seconds while Let's Encrypt checks the domain)"
+if [[ $TEST == true ]]; then
+  summary Test "dry run against Let's Encrypt's staging server: no certificate, no config change"
+else
+  summary Renewal "$( [[ $RENEW == yes ]] && echo automatic || echo "off (renew by hand before it expires)" )"
+  summary "Check first" "http://$FQDN must reach this server: DNS points here, port 80 is open, the proxy is running."
+  summary "" "Too many failed requests get you blocked by Let's Encrypt for a while: test with --dry-run first."
+fi
+confirm_summary "$( [[ $TEST == true ]] && echo "Run the test?" || echo "Request the certificate for $FQDN?" )"
+
+if [[ $TEST == true ]]; then
+  [[ $PROXY == apache2 ]] && SVC=apache2 || SVC=nginx
+  if lxc exec proxy -- certbot certonly --dry-run --standalone -d "$FQDN" -m "$EMAIL" --agree-tos -n --no-eff-email \
+       --pre-hook "service $SVC stop" --post-hook "service $SVC start"; then
+    echo "The test passed: Let's Encrypt can reach $FQDN. Run dhis2-ssl-setup without --dry-run to get the certificate."
+    exit 0
+  fi
+  die "the test failed: check that $FQDN points to this server and that port 80 reaches the proxy"
+fi
 
 if [[ $PROXY == "nginx" ]]; then
 	# the stop/start hooks are saved in the renewal config, so 'certbot renew' works later
