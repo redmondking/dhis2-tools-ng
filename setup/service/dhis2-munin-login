@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+#       ____  __  ______________
+#      / __ \/ / / /  _/ ___/__ \
+#     / / / / /_/ // / \__ \__/ /
+#    / /_/ / __  // / ___/ / __/
+#   /_____/_/ /_/___//____/____/
+#
+#   Set the login for the Munin pages (https://<fqdn>/munin)
+
+PROG=$(basename "$0")
+source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
+
+usage() {
+  echo "Usage: $PROG [options]"
+  echo "Options:"
+  echo "  -U <username>     Munin username (default admin)"
+  echo "  --password-stdin  Read the password from stdin"
+  echo "  -h, --help        Display this help message"
+  exit "${1:-1}"
+}
+
+[[ $EUID -eq 0 ]] || die "please run with sudo"
+
+MUNIN_USER=""
+PASSWORD_STDIN=false
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -U) MUNIN_USER=$2; shift ;;
+    --password-stdin) PASSWORD_STDIN=true ;;
+    -h|--help) usage 0 ;;
+    *) usage ;;
+  esac
+  shift
+done
+
+lxc info monitor >/dev/null 2>&1 || die "Munin is not installed on this server (there is no monitor container)"
+PROXY=$(jq -r .proxy /usr/local/etc/dhis/containers.json)
+case $PROXY in
+  nginx)   PASSWD_FILE=/etc/nginx/munin.htpasswd;   SITE=/etc/nginx/upstream/munin.conf ;;
+  apache2) PASSWD_FILE=/etc/apache2/munin.htpasswd; SITE=/etc/apache2/upstream/munin ;;
+  *) die "proxy type $PROXY not supported" ;;
+esac
+
+[[ -n $MUNIN_USER ]] || ask MUNIN_USER "Munin username" admin -U
+ask_password PASSWORD Munin $PASSWORD_STDIN
+
+# SHA-512 crypt hash, made inside the proxy; the password only travels on stdin
+HASH=$(printf '%s\n' "$PASSWORD" | lxc exec proxy -- openssl passwd -6 -stdin) || die "could not hash the password"
+printf '%s:%s\n' "$MUNIN_USER" "$HASH" | lxc exec proxy -- sh -c "umask 027; cat > $PASSWD_FILE"
+lxc exec proxy -- chgrp www-data "$PASSWD_FILE"
+
+# make sure the munin location asks for it (servers set up before logins existed)
+if ! lxc exec proxy -- grep -q "$PASSWD_FILE" "$SITE"; then
+  if [[ $PROXY == nginx ]]; then
+    lxc exec proxy -- sed -i "/location \/munin {/a\\      auth_basic \"Munin\";\n      auth_basic_user_file $PASSWD_FILE;" "$SITE"
+  else
+    lxc exec proxy -- sed -i -e 's|</LOcation>|</Location>|' \
+      -e "s|Require all granted|AuthType Basic\n    AuthName \"Munin\"\n    AuthUserFile $PASSWD_FILE\n    Require valid-user|" "$SITE"
+  fi
+fi
+
+if [[ $PROXY == nginx ]]; then
+  lxc exec proxy -- nginx -t -q && lxc exec proxy -- service nginx reload
+else
+  lxc exec proxy -- apache2ctl -t && lxc exec proxy -- service apache2 reload
+fi || die "the proxy rejected the new configuration, check $SITE in the proxy container"
+echo "Munin login set for $MUNIN_USER"

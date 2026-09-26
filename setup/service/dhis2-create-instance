@@ -239,6 +239,11 @@ rm /tmp/tomcat9
 lxc exec $NAME -- chmod 644 /etc/default/tomcat9
 lxc exec $NAME -- systemctl daemon-reload
 lxc exec $NAME -- service rsyslog restart
+# before the restart below, so tomcat picks up the monitoring user
+if [[ $MUNIN == yes ]]; then
+  "$(dirname "$(readlink -f "$0")")/dhis2-tomcat-munin" $NAME
+fi
+lxc config set $NAME user.dhis2.munin $MUNIN
 lxc exec $NAME -- service tomcat9 restart
 
 # Append to bottom /etc/hosts
@@ -347,8 +352,3 @@ else
   echo "Error: Proxy type not supported"
   exit 1
 fi
-
-if [[ $MUNIN == yes ]]; then
-  "$(dirname "$(readlink -f "$0")")/dhis2-tomcat-munin" $NAME
-fi
-lxc config set $NAME user.dhis2.munin $MUNIN

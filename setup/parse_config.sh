@@ -29,7 +29,7 @@ NAMES=$(echo $CONFIG | jq -r .containers[].name)
 TYPES=$(echo $CONFIG | jq -r .containers[].type)
 
 case $MONITORING in
-     munin)
+     munin|none)
           # echo "Using munin monitor"
           ;;
      *)
@@ -38,7 +38,7 @@ case $MONITORING in
 esac
 
 case $APM in
-     glowroot)
+     glowroot|none)
           # echo "Using glowroot monitor"
           ;;
      *)

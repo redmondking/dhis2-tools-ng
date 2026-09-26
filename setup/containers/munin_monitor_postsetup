@@ -7,6 +7,8 @@ then
     # Proxy pass to servlet container
 
     location /munin {
+      auth_basic "Munin";
+      auth_basic_user_file /etc/nginx/munin.htpasswd;
       proxy_pass                http://${MUNIN_IP}/munin;
       proxy_redirect            off;
       proxy_set_header Host \$host;
@@ -38,15 +40,26 @@ then
 #if proxy is apache2 ;
   cat <<EOF > /tmp/munin
   <Location /munin>
-    Require all granted
+    AuthType Basic
+    AuthName "Munin"
+    AuthUserFile /etc/apache2/munin.htpasswd
+    Require valid-user
     ProxyPass "http://${MUNIN_IP}/munin"
     ProxyPassReverse "http://${MUNIN_IP}/munin"
-  </LOcation>
+  </Location>
 EOF
   lxc file push /tmp/munin proxy/etc/apache2/upstream/munin
+  rm /tmp/munin
   lxc exec proxy -- service apache2 reload
 else
   echo "Error: Proxy type not supported"
   exit 1
 fi
 
+# /munin stays closed until it has a login
+if [[ -t 0 ]]; then
+  echo "Set the login for the Munin pages"
+  service/dhis2-munin-login
+else
+  echo "No Munin login yet: /munin stays closed until you run: sudo dhis2-munin-login"
+fi
