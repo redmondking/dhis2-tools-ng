@@ -3,6 +3,7 @@
 # Configures tomcat munin monitoring
 
 PROG=`basename $0`
+# shellcheck source=../lib/dhis2-lib.sh
 source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
 
 MUNIN_IP=$(cat /usr/local/etc/dhis/containers.json| jq -r '.containers[] | select(.name=="monitor") | .ip')
@@ -16,21 +17,15 @@ usage() {
   echo "  -h, --help       Display this help message"
 }
 
-while getopts h opt
-do
-  case $opt in
-    h) usage; exit 0;;
-    *) echo "Error: Unknown parameter '$OPTARG'."
-      exit 1;;
-  esac
-done
+case ${1-} in
+  -h|--help) usage; exit 0 ;;
+  -*) die "unknown option $1 (see $PROG --help)" ;;
+  "") usage >&2; exit 3 ;;
+esac
 
-shift $(($OPTIND - 1))
-
-if [ "$#" -lt 1 ]; then
-  usage
-  exit 1
-fi
+# stop at the first step that fails, instead of carrying on with a half-configured instance
+set -e
+trap 'echo "Error: setting up Munin for $INSTANCE failed at: $BASH_COMMAND" >&2' ERR
 
 
 INSTANCE=$1

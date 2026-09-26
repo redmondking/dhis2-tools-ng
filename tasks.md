@@ -193,7 +193,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
       open Munin/Glowroot pages without a terminal. Also the Glowroot login mode (`--glowroot-login shared|own`) and usernames
 - [~] 3b.11 `dhis2-tools-update --check --json` → `{"current", "latest", "update_available"}`
 - [~] 3b.12 `dhis2-glowroot-login` / `dhis2-munin-login`: `--dry-run`, summary + confirm; glowroot-login also `--restart yes|no` (which instances would change and restart)
-- [ ] 3b.13 `dhis2-tomcat-munin`: stop at the first failure and exit non-zero
+- [~] 3b.13 `dhis2-tomcat-munin`: stop at the first failure and exit non-zero (names the failed step)
 - [ ] 3b.17 (found in 3b.9) `dhis2-ssl-setup`: stop when certbot fails. Today it carries on and switches nginx to a certificate
       that doesn't exist, which breaks the proxy
 - [ ] 3b.16 Every short flag also gets a long name, both in `-h` (`-V`/`--release`, `-g`/`--glowroot`, `-m`/`--munin`, ...)
