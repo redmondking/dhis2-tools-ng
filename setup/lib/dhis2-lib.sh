@@ -104,13 +104,10 @@ secret() {
 }
 
 # ask_password VAR "label" [secret_key]: the password from --secrets-stdin (secret_key), else typed twice at a prompt,
-# else noted as missing. (Until 3b.15 moves its callers over, "true" as third argument still reads one line of stdin.)
+# else noted as missing.
 ask_password() {
   local __var=$1 __label=$2 __key=${3-} __p1="" __p2=""
-  if [[ $__key == true ]]; then
-    IFS= read -r __p1 || true
-    [[ -n $__p1 ]] || die "no $__label password on stdin"
-  elif [[ -n $__key && $__key != false ]] && __p1=$(secret "$__key"); then
+  if [[ -n $__key ]] && __p1=$(secret "$__key"); then
     :
   elif interactive; then
     while true; do
@@ -151,13 +148,15 @@ print(b64(hashlib.pbkdf2_hmac("sha1", password, salt, 500000, 16)) + ":" + b64(s
 DHIS2_TOOLS=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 GLOWROOT_LOGIN_FILE=/usr/local/etc/dhis/glowroot-login
 
-# glowroot_new_login USERNAME FROM_STDIN -> sets GR_USER, GR_HASH
-# USERNAME empty: ask for it (default admin).
+# glowroot_new_login USERNAME [SECRET_KEY] -> sets GR_USER, GR_HASH
+# USERNAME empty: ask for it (default admin). The password comes from --secrets-stdin (SECRET_KEY, default
+# glowroot_password) or a prompt; if neither is possible it is noted as missing (check_missing) and GR_HASH stays empty.
 glowroot_new_login() {
   local password
-  if [[ -n $1 ]]; then GR_USER=$1; else ask GR_USER "Glowroot username" admin -U; fi
-  ask_password password Glowroot "${2:-false}"
-  GR_HASH=$(printf '%s\n' "$password" | glowroot_hash)
+  GR_HASH=""
+  if [[ -n $1 ]]; then GR_USER=$1; else ask GR_USER "Glowroot username" admin --glowroot-user; fi
+  ask_password password Glowroot "${2:-glowroot_password}"
+  [[ -z $password ]] || GR_HASH=$(printf '%s\n' "$password" | glowroot_hash)
 }
 
 # glowroot_load_shared -> sets GR_USER, GR_HASH from the shared login; returns 1 if there is none yet

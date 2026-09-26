@@ -8,30 +8,36 @@
 #   Set the login for the Munin pages (https://<fqdn>/munin)
 
 PROG=$(basename "$0")
+# shellcheck source=../lib/dhis2-lib.sh
 source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
 
 usage() {
-  echo "Usage: $PROG [options]"
-  echo "Options:"
-  echo "  -U <username>     Munin username (default admin)"
-  echo "  --password-stdin  Read the password from stdin"
-  echo "  -h, --help        Display this help message"
+  cat <<EOF
+Usage: $PROG [options]
+Options:
+  -U, --munin-user <name>  Munin username (default admin)
+      --secrets-stdin      read the password as JSON from stdin: {"munin_password": "..."}
+  -y, --yes                ask nothing
+      --dry-run            show what would change, change nothing (no password is asked)
+  -h, --help               this help
+Exit codes: 0 ok, 1 failure, 3 missing input.
+EOF
   exit "${1:-1}"
 }
 
-[[ $EUID -eq 0 ]] || die "please run with sudo"
-
 MUNIN_USER=""
-PASSWORD_STDIN=false
 while [[ $# -gt 0 ]]; do
   case $1 in
-    -U) MUNIN_USER=$2; shift ;;
-    --password-stdin) PASSWORD_STDIN=true ;;
+    -U|--munin-user) MUNIN_USER=${2-}; shift ;;
+    --secrets-stdin) secrets_load munin_password ;;
+    -y|--yes) YES=true ;;
+    --dry-run) DRY_RUN=true ;;
     -h|--help) usage 0 ;;
-    *) usage ;;
+    *) die "unknown option $1 (see $PROG --help)" ;;
   esac
   shift
 done
+[[ $EUID -eq 0 ]] || die "please run with sudo"
 
 lxc info monitor >/dev/null 2>&1 || die "Munin is not installed on this server (there is no monitor container)"
 PROXY=$(jq -r .proxy /usr/local/etc/dhis/containers.json)
@@ -41,8 +47,14 @@ case $PROXY in
   *) die "proxy type $PROXY not supported" ;;
 esac
 
-[[ -n $MUNIN_USER ]] || ask MUNIN_USER "Munin username" admin -U
-ask_password PASSWORD Munin $PASSWORD_STDIN
+[[ -n $MUNIN_USER ]] || ask MUNIN_USER "Munin username" admin --munin-user
+PASSWORD=""
+[[ $DRY_RUN == true ]] || ask_password PASSWORD Munin munin_password
+check_missing
+
+summary Login "the Munin pages, /munin on the proxy ($PROXY)"
+summary User "$MUNIN_USER"
+confirm_summary "Set the Munin login?"
 
 # SHA-512 crypt hash, made inside the proxy; the password only travels on stdin
 HASH=$(printf '%s\n' "$PASSWORD" | lxc exec proxy -- openssl passwd -6 -stdin) || die "could not hash the password"

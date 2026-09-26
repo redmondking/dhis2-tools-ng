@@ -8,66 +8,97 @@
 #   Set the Glowroot login: the shared one used by all instances, or one instance's own
 
 PROG=$(basename "$0")
+# shellcheck source=../lib/dhis2-lib.sh
 source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
 
 usage() {
-  echo "Usage: $PROG [options] [<instance>]"
-  echo "  (no instance)  set the shared login, and update every instance that uses it"
-  echo "  instance       give this instance its own login"
-  echo "Options:"
-  echo "  -U <username>     Glowroot username (default admin)"
-  echo "  --password-stdin  Read the password from stdin"
-  echo "  -y                Restart the affected instances without asking (Glowroot reads its login at startup)"
-  echo "  -h, --help        Display this help message"
+  cat <<EOF
+Usage: $PROG [options] [<instance>]
+  (no instance)  set the shared login, and update every running instance that uses it
+  instance       give this instance its own login
+Glowroot reads its login when tomcat starts, so the affected instances need a restart.
+Options:
+  -U, --glowroot-user <name>  Glowroot username (default admin)
+      --restart yes|no        restart the affected instances now (asked on a terminal, default no; with -y: yes)
+      --secrets-stdin         read the password as JSON from stdin: {"glowroot_password": "..."}
+  -y, --yes                   ask nothing
+      --dry-run               show what would change, change nothing (no password is asked)
+  -h, --help                  this help
+Exit codes: 0 ok, 1 failure, 3 missing input.
+EOF
   exit "${1:-1}"
 }
 
-[[ $EUID -eq 0 ]] || die "please run with sudo"
-
 GR_USER_OPT=""
-PASSWORD_STDIN=false
-YES=false
+RESTART=""
 INSTANCE=""
 while [[ $# -gt 0 ]]; do
   case $1 in
-    -U) GR_USER_OPT=$2; shift ;;
-    --password-stdin) PASSWORD_STDIN=true ;;
-    -y) YES=true ;;
+    -U|--glowroot-user) GR_USER_OPT=${2-}; shift ;;
+    --restart) RESTART=${2-}; shift
+        [[ $RESTART =~ ^(yes|no)$ ]] || die "--restart takes yes or no" ;;
+    --secrets-stdin) secrets_load glowroot_password ;;
+    -y|--yes) YES=true ;;
+    --dry-run) DRY_RUN=true ;;
     -h|--help) usage 0 ;;
-    -*) die "unknown option $1" ;;
-    *) [[ -z $INSTANCE ]] || usage; INSTANCE=$1 ;;
+    -*) die "unknown option $1 (see $PROG --help)" ;;
+    *) [[ -z $INSTANCE ]] || die "one instance at a time"; INSTANCE=$1 ;;
   esac
   shift
 done
+[[ $EUID -eq 0 ]] || die "please run with sudo"
 
+running() { [[ $(lxc list -c s --format csv "^${1}\$") == RUNNING ]]; }
+
+# which instances change
+AFFECTED=()
+STOPPED=()
 if [[ -n $INSTANCE ]]; then
   [[ $(lxc config get "$INSTANCE" user.dhis2.glowroot 2>/dev/null) =~ ^(shared|own)$ ]] \
     || die "$INSTANCE does not exist or has no Glowroot"
-  [[ $(lxc list -c s --format csv "^${INSTANCE}\$") == RUNNING ]] || die "$INSTANCE is not running"
-  echo "Glowroot login for $INSTANCE"
-  glowroot_new_login "$GR_USER_OPT" $PASSWORD_STDIN
-  glowroot_write_admin "$INSTANCE" own
+  running "$INSTANCE" || die "$INSTANCE is not running"
   AFFECTED=("$INSTANCE")
 else
-  echo "Shared Glowroot login, used by every instance set to the shared login"
-  glowroot_new_login "$GR_USER_OPT" $PASSWORD_STDIN
-  glowroot_save_shared
-  AFFECTED=()
   for C in $(lxc list -c n --format csv); do
     [[ $(lxc config get "$C" user.dhis2.glowroot) == shared ]] || continue
-    if [[ $(lxc list -c s --format csv "^${C}\$") != RUNNING ]]; then
-      echo "$C: not running, run this again once it is started"
-      continue
-    fi
-    glowroot_write_admin "$C" shared
-    AFFECTED+=("$C")
+    if running "$C"; then AFFECTED+=("$C"); else STOPPED+=("$C"); fi
   done
 fi
 
-[[ ${#AFFECTED[@]} -gt 0 ]] || { echo "No instances to update"; exit 0; }
+if [[ $DRY_RUN == false ]]; then
+  if [[ -n $INSTANCE ]]; then
+    interactive && echo "Glowroot login for $INSTANCE" >&2
+  else
+    interactive && echo "Shared Glowroot login, used by every instance set to the shared login" >&2
+  fi
+  glowroot_new_login "$GR_USER_OPT" glowroot_password
+fi
+if [[ -z $RESTART && ${#AFFECTED[@]} -gt 0 ]]; then
+  if [[ $YES == true ]]; then
+    RESTART=yes
+  elif interactive; then
+    ask_yes_no "Restart tomcat on ${AFFECTED[*]} after the change? DHIS2 will be down for a few minutes" n \
+      && RESTART=yes || RESTART=no
+  fi
+fi
+check_missing
+
+if [[ -n $INSTANCE ]]; then summary Login "own login for $INSTANCE"; else summary Login "the shared login"; fi
+[[ $DRY_RUN == true ]] || summary User "$GR_USER"
+summary Instances "${AFFECTED[*]:-none running}"
+[[ ${#STOPPED[@]} -eq 0 ]] || summary "Not running" "${STOPPED[*]} (run this again once started)"
+summary Restart "${RESTART:-no}$( [[ ${RESTART:-no} == no ]] && echo " (the old login stays in use until the next restart)")"
+confirm_summary "Set the Glowroot login?"
+
+if [[ -n $INSTANCE ]]; then
+  glowroot_write_admin "$INSTANCE" own
+else
+  glowroot_save_shared
+  for C in ${AFFECTED[@]+"${AFFECTED[@]}"}; do glowroot_write_admin "$C" shared; done
+fi
+[[ ${#AFFECTED[@]} -gt 0 ]] || { echo "Login saved; no running instances to update"; exit 0; }
 echo "Updated: ${AFFECTED[*]}"
-echo "Glowroot reads its login at startup, so the new login works after tomcat restarts."
-if [[ $YES == true ]] || ask_yes_no "Restart tomcat on ${AFFECTED[*]} now? DHIS2 will be down for a few minutes" n; then
+if [[ ${RESTART:-no} == yes ]]; then
   for C in "${AFFECTED[@]}"; do
     echo "Restarting $C"
     lxc exec "$C" -- service "$(instance_tomcat "$C")" restart

@@ -176,7 +176,7 @@ Background: the original setup gave Glowroot's `anonymous` user the Administrato
     `/usr/local/etc/dhis/glowroot-login`, root only) or **own** (asked per instance).
   - Users added in Glowroot's own screens are kept; only the login managed by the tools is replaced.
   - `dhis2-glowroot-login [instance]`: no instance changes the shared login everywhere; with one, sets its own login.
-    Glowroot reads `admin.json` only at startup, so it asks before restarting.
+    Glowroot reads `admin.json` only at startup, so it asks before restarting (`--restart yes|no`; with `-y`: yes).
   - Glowroot on Tomcat 10 (2.42+, Jakarta) is on the test list; if it doesn't work, it is turned off for 2.42+.
 - Munin and Glowroot logins are always separate. Passwords are typed by the user (twice); no defaults, nothing generated.
 - Later: turning Glowroot or Munin on or off for an existing instance.

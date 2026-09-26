@@ -76,6 +76,8 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
     - `dhis2-create-instance -y` from a script with `--secrets-stdin`, and `--dry-run` (nothing created)
     - `dhis2-deploy-war` interactively: source menu, summary, going back with `--force` (typed instance name), a create-only
       instance getting its first release; `-y` and `--dry-run` from a script
+    - `dhis2-glowroot-login` (shared and own) and `dhis2-munin-login`, interactively and with `--secrets-stdin -y`; the new
+      login works after the restart
     - `dhis2-restoredb` into a running instance: tomcat stops, the restore runs, tomcat starts; with a broken dump it must
       exit non-zero and still start tomcat
     - `dhis2-delete-instance --dry-run`, then a real delete; `dhis2-delete-instance postgres` must refuse
@@ -190,13 +192,13 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] 3b.14 `dhis2-upgrade-setup` takes the Munin and Glowroot passwords as flags (agreed 2026-09-26), so automation can close
       open Munin/Glowroot pages without a terminal. Also the Glowroot login mode (`--glowroot-login shared|own`) and usernames
 - [~] 3b.11 `dhis2-tools-update --check --json` → `{"current", "latest", "update_available"}`
-- [ ] 3b.12 `dhis2-glowroot-login` / `dhis2-munin-login`: `--dry-run` (which instances would change and restart)
+- [~] 3b.12 `dhis2-glowroot-login` / `dhis2-munin-login`: `--dry-run`, summary + confirm; glowroot-login also `--restart yes|no` (which instances would change and restart)
 - [ ] 3b.13 `dhis2-tomcat-munin`: stop at the first failure and exit non-zero
 - [ ] 3b.17 (found in 3b.9) `dhis2-ssl-setup`: stop when certbot fails. Today it carries on and switches nginx to a certificate
       that doesn't exist, which breaks the proxy
 - [ ] 3b.16 Every short flag also gets a long name, both in `-h` (`-V`/`--release`, `-g`/`--glowroot`, `-m`/`--munin`, ...)
 - Order (agreed): 3b.1 helpers → 3b.2 create-instance, 3b.3 deploy-war → security fixes 3b.7 logview, 3b.9 ssl-setup → the rest.
-- [ ] 3b.15 `--password-stdin` → `--secrets-stdin` in `dhis2-create-instance`, `dhis2-glowroot-login`, `dhis2-munin-login`;
+- [~] 3b.15 `--password-stdin` → `--secrets-stdin` in `dhis2-create-instance`, `dhis2-glowroot-login`, `dhis2-munin-login`;
       `-U` → `--glowroot-user` / `--munin-user` (keep `-U` as a short form)
 
 ## Phase 4 – Hostnames and paths
