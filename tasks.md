@@ -163,7 +163,8 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   - `--based-on`, `--sha256`, and "choose another release" on a checksum failure
   - summary + confirm, `--dry-run`
 - [ ] 3b.4 `dhis2-delete-instance`: `--dry-run` (lists everything that would be removed), `--postgres`, "add -y" without a terminal, errors to stderr
-- [ ] 3b.5 `dhis2-restoredb`: `--dry-run`, `--postgres` (no longer hardcoded), "add -y" without a terminal
+- [ ] 3b.5 `dhis2-restoredb`: `--dry-run`, `--postgres` (no longer hardcoded; from phase 6 the default comes from the instance's
+      `user.dhis2.postgres` label), "add -y" without a terminal
 - [ ] 3b.6 `dhis2-dbactivity --json`, `--postgres`
 - [ ] 3b.7 `dhis2-logview`: **security fix**. The `-g` text currently goes through a shell as root in the container.
       Run `journalctl` with an argument list instead. Fix `-f`/`-r` (they swallow the next argument). Add `--json` (journalctl `-o json`)
@@ -219,6 +220,9 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 
 ## Phase 6 – Backups
 
+- Where `dhis2-backup` gets its information (agreed 2026-09-26, details in `architecture.md` section 10):
+  `dhis2-env` = how (server-wide settings), instance labels = what (`user.dhis2.backup`, `user.dhis2.postgres`),
+  remotes files = where to copy. The old `PLAIN_BACKUPS`/`ENCRYPTED_BACKUPS` lists remain only for databases without an instance.
 - [ ] 6.1 Setup wizard asks for the backup settings, each with a default. They are written to `dhis2-env` and the cron job is enabled.
   - time
   - daily backups to keep (7)
@@ -226,8 +230,11 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   - monthly backups to keep (12, the 1st)
   - backup directory
   - optional remote rsync target
-- [ ] 6.2 `dhis2-backup`: delete old monthly backups, use each database's own container, quote names
-- [ ] 6.3 `dhis2-create-instance` (`--backup yes|no`): "Back up this instance? [Y/n]" adds it to `PLAIN_BACKUPS`. `dhis2-delete-instance` removes it
+- [ ] 6.2 `dhis2-backup`: read what to back up from the labels (plus legacy list entries without an instance), dump each database from
+      the container in its `user.dhis2.postgres` label, delete old monthly backups (`MONTHS_TO_KEEP`), quote names.
+      A stopped instance: database still dumped; file store reported as skipped if it can't be archived (confirm when planning)
+- [ ] 6.3 `dhis2-create-instance` (`--backup plain|encrypted|no`): "Back up this instance?" sets `user.dhis2.backup`, and always records
+      `user.dhis2.postgres`. Nothing to clean up on delete: the labels go with the container
 - [ ] 6.4 New layout: group by instance, then by date. Each run is one folder holding the database and the file store:
   ```
   /var/pgbackups/
@@ -317,7 +324,14 @@ Testing: connect ✓  write ✓  delete test file ✓
 - [ ] 8.2 Move proxy config to the per-hostname layout
 - [ ] 8.3 (moved to 3.9)
 - [ ] 8.4 Optional PostgreSQL 13 → 16 upgrade, with a checked backup first
-- [ ] 8.5 Keep existing `dhis2-env` backup settings, only adding new keys
+- [ ] 8.5 Keep existing `dhis2-env` backup settings, only adding new keys (`MONTHS_TO_KEEP`)
+- [ ] 8.9 Backup labels for existing instances:
+  - `user.dhis2.postgres` from `connection.url` in `/opt/dhis2/dhis.conf`
+  - names in `PLAIN_BACKUPS`/`ENCRYPTED_BACKUPS` with an instance container → `user.dhis2.backup` = `plain`/`encrypted`,
+    and removed from the lists; names without an instance stay in the lists
+  - all other instances → `user.dhis2.backup` = `no`
+  - must run before the new `dhis2-backup` is used, so no backup is missed; stopped instances are labelled too (labels
+    don't need the container running; `dhis.conf` does, so the postgres label waits for a running container, defaulting to `postgres`)
 - [ ] 8.6 Move existing backups into the new layout: `backup<date>-<type>/<db>.sql.gz*` → `<db>/<date>-<type>/`.
       Tell the user the remote copy will receive the new layout, and that the old remote folders are left for them to remove.
 - [ ] 8.7 Turn an old `REMOTE=` setting in `dhis2-env` into remote `remote1`, SSH type, mode `keep` (same behaviour as before)

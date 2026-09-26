@@ -127,6 +127,8 @@ All state about an instance lives on its container:
 | `user.dhis2.glowroot` | `shared` / `own` / `off` | create-instance, `dhis2-glowroot-login` |
 | `user.dhis2.glowroot.user` | the Glowroot username managed by the tools | same |
 | `user.dhis2.munin` | `yes` / `no` | create-instance |
+| `user.dhis2.backup` | `plain` / `encrypted` / `no` | [planned, phase 6] create-instance |
+| `user.dhis2.postgres` | the postgres container holding its database | [planned, phase 6] create-instance |
 | `user.dhis2.hostname`, `user.dhis2.path` | [planned, phase 4] | create-instance, `dhis2-move-instance` |
 
 Instances made by older versions are labelled by `dhis2-upgrade-setup` (version from the deployed war's `dhis-api-*.jar`).
@@ -186,11 +188,25 @@ Background: the original setup gave Glowroot's `anonymous` user the Administrato
 
 ## 10. Backups  [planned, phase 6; bug fixes built]
 
-- Settings asked in the wizard, each with a default, written to `/usr/local/etc/dhis/dhis2-env`, cron enabled:
+- **Where `dhis2-backup` gets its information** (agreed 2026-09-26):
+  1. `/usr/local/etc/dhis/dhis2-env`: **how**, the same for the whole server: `BACKUP_DIR`, `DAYS_TO_KEEP`,
+     `WEEKS_TO_KEEP`, `DAY_OF_WEEK_TO_KEEP`, `MONTHS_TO_KEEP` (new), `CIPHER`, `PASSWORD_FILE`, `EXCLUDED`.
+  2. Labels on each instance container: **what**. `user.dhis2.backup` = `plain` / `encrypted` / `no`, and
+     `user.dhis2.postgres` = the postgres container holding its database. The instance name is the database name; the instance
+     container holds `/opt/dhis2/files`. One `lxc list` call reads them all.
+  3. `/usr/local/etc/dhis/remotes/<name>`: **where to send copies** after the local run.
+  - Legacy: databases still named in `PLAIN_BACKUPS` / `ENCRYPTED_BACKUPS` in `dhis2-env` that have **no** instance container
+    are still dumped (database only, from `postgres`), so nothing backed up today silently stops.
+  - Not in `dhis2-env`: which instances are backed up (labels), the remotes (own files), the time of the run (`/etc/cron.d/dhis`).
+  - Other readers of `dhis2-env`: `dhis2-list-backups` (`BACKUP_DIR`), restore (`BACKUP_DIR`, `PASSWORD_FILE`),
+    `dhis2-backup-remote add` (`PASSWORD_FILE`, for the unencrypted-instances warning). The wizard / `setup.sh --config` write it.
+- Settings asked in the wizard, each with a default, written to `dhis2-env`, cron enabled:
   time of the nightly run, daily backups to keep (7), weekly (3, Sundays), monthly (12, on the 1st), backup dir
   (`/var/pgbackups`).
-- `dhis2-create-instance` asks "Back up this instance? [Y/n]" (`--backup yes|no`); `dhis2-delete-instance` removes it from the
-  list. Deleting an instance drops its database, but its backups are kept.
+- `dhis2-create-instance` asks "Back up this instance? [Y/n]" (`--backup yes|no`; encrypted or plain) and sets the labels.
+  Deleting an instance drops its database; its label goes with the container, and its existing backups are kept.
+- A stopped instance: its database is still dumped (postgres runs separately); if its file store can't be archived, the run
+  reports that as skipped (to confirm when planning phase 6).
 - Layout, grouped by instance, then by date:
   ```
   /var/pgbackups/<instance>/<date>-<daily|weekly|monthly>/<instance>.sql.gz[.enc]
@@ -210,7 +226,13 @@ Background: the original setup gave Glowroot's `anonymous` user the Administrato
   - Without a terminal the SSH key can't be installed (it needs the remote password): `--install-key no` prints the public key
     for the caller to add. Cloud credentials come in `--secrets-stdin`.
   - No fetch from remotes. Failure alerts (e.g. email) come later.
-- Existing servers: old backups are moved into the new layout; an old `REMOTE=` becomes remote `remote1` in `keep` mode.
+- Existing servers (`dhis2-upgrade-setup`):
+  - instances named in `PLAIN_BACKUPS` / `ENCRYPTED_BACKUPS` get `user.dhis2.backup` = `plain` / `encrypted` and are removed
+    from the lists; names with no instance container stay in the lists (legacy)
+  - every instance gets `user.dhis2.postgres`, read from `connection.url` in its `/opt/dhis2/dhis.conf`
+    (`jdbc:postgresql://<container>/<db>`); other instances get `user.dhis2.backup` = `no`
+  - `MONTHS_TO_KEEP` is added to `dhis2-env` if missing; existing values are kept
+  - old backups are moved into the new layout; an old `REMOTE=` becomes remote `remote1` in `keep` mode
 
 ## 11. Create an instance from a backup  [planned, phase 7]
 
@@ -300,3 +322,5 @@ overwritten and may hold local edits, so only known lines are patched). It is sa
 - 2026-09-26: create-instance asks create-and-deploy vs create-only, shows a summary to confirm; own wars supported.
 - 2026-09-26: restoring after deploying (stop, restore, start) instead of a "restore before first start".
 - 2026-09-26: `--install-key no` for remotes; new `dhis2-list-backups`; `dhis2-upgrade-setup` takes passwords via `--secrets-stdin`.
+- 2026-09-26: `dhis2-backup` reads how from `dhis2-env`, what from instance labels (`user.dhis2.backup`, `user.dhis2.postgres`),
+  and where to copy from the remotes files; the old lists stay only for databases without an instance.
