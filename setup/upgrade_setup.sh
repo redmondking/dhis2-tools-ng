@@ -231,6 +231,35 @@ else
 fi
 
 ########################################################################
+echo
+echo "== 10. Labels on existing instances"
+# dhis2-list-instances and dhis2-deploy-war read these; instances from older versions never had them
+label() {   # label KEY VALUE: set user.dhis2.KEY on $C unless it already has a value
+  [[ -z $(lxc config get "$C" "user.dhis2.$1") ]] || return 0
+  lxc config set "$C" "user.dhis2.$1" "$2"
+  SET="$SET $1=$2"
+}
+for ROW in $(lxc list -c ns --format csv); do
+  C=${ROW%,*} STATE=${ROW#*,}
+  lxc config get "$C" user.type | grep -q Tomcat || continue
+  if [[ $STATE != RUNNING ]]; then
+    echo "$C: skipped (not running), start it and re-run to label it"
+    continue
+  fi
+  SET=""
+  T=$(instance_tomcat "$C")
+  label tomcat "$T"
+  V=$(lxc exec "$C" -- sh -c "ls /var/lib/$T/webapps/*/WEB-INF/lib/dhis-api-*.jar 2>/dev/null" \
+      | sed -n 's|.*/dhis-api-\(.*\)\.jar$|\1|p' | head -1)
+  label version "${V:-none}"
+  J=$(lxc exec "$C" -- sh -c 'readlink -f "$(command -v java)"' | sed -n 's|.*/java-\([0-9]*\)-openjdk.*|\1|p')
+  [[ -z $J ]] || label java "$J"
+  lxc exec "$C" -- test -f /opt/glowroot/admin.json || label glowroot off
+  if lxc exec "$C" -- test -x /usr/sbin/munin-node; then label munin yes; else label munin no; fi
+  if [[ -n $SET ]]; then echo "$C:$SET"; else echo "$C: already labelled"; fi
+done
+
+########################################################################
 if [[ ${#RESTART[@]} -gt 0 ]]; then
   echo
   echo "== Restarts"
