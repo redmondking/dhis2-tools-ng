@@ -100,6 +100,8 @@ The release decides Ubuntu, Tomcat and Java; there is no `-j`.
 - `dhis2-create-instance`: asks first whether to create and deploy DHIS2, or create only (`--no-deploy`). Then where DHIS2
   comes from: 1) an official release (`-V`) 2) own war file on the server (`-f`) 3) own war at a URL (`-l`).
   The war is downloaded and checked **before** anything is created.
+  - Create only still needs the version line, which decides Ubuntu/Tomcat/Java: "Which DHIS2 version will it run?"
+    (`--line 2.42`). `dhis2-deploy-war` then offers only releases from that line.
 - `dhis2-deploy-war`: the same source menu; for official releases it lists only the instance's own version line, with the
   current release marked.
   - Another major version (2.41 → 2.42) is always refused, and so is a release needing a different Tomcat.
@@ -256,6 +258,8 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
   If anything is missing, the command stops **before changing anything** and lists **all** missing flags in one error (exit 3).
 - Without `-y` and without a terminal nothing can be asked, including a confirmation: the command stops and says to add `-y`
   (exit 3). Automation therefore always passes `-y`, and nothing ever hangs.
+- Every short flag also has a long name, both shown in `-h` (e.g. `-V`/`--release`, `-g`/`--glowroot`, `-m`/`--munin`,
+  `-n`/`--no-database`, `-U`/`--glowroot-user`), so automation scripts read clearly.
 - Example, `dhis2-create-instance` with `-y`: required: name, `-V`/`-f`/`-l` (unless `--no-deploy`), `--based-on` (only if an
   own war's version can't be read), `-g`, `-m` (if Munin is installed), the Glowroot password (if needed). Safe defaults:
   IP (next free), postgres container (`postgres`), Glowroot user (`admin`), create and deploy.
@@ -322,5 +326,8 @@ overwritten and may hold local edits, so only known lines are patched). It is sa
 - 2026-09-26: create-instance asks create-and-deploy vs create-only, shows a summary to confirm; own wars supported.
 - 2026-09-26: restoring after deploying (stop, restore, start) instead of a "restore before first start".
 - 2026-09-26: `--install-key no` for remotes; new `dhis2-list-backups`; `dhis2-upgrade-setup` takes passwords via `--secrets-stdin`.
+- 2026-09-26 (phase 3b): create-only asks the version line (`--line`); `dhis2-restoredb` stops the instance's Tomcat, restores and
+  starts it again when the database belongs to an instance; every short flag gets a long name; 3b order: helpers, create-instance
+  and deploy-war, the security fixes (logview, ssl-setup), then the rest, one commit per command.
 - 2026-09-26: `dhis2-backup` reads how from `dhis2-env`, what from instance labels (`user.dhis2.backup`, `user.dhis2.postgres`),
   and where to copy from the remotes files; the old lists stay only for databases without an instance.

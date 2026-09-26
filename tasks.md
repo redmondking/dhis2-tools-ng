@@ -12,6 +12,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 - Command and flag rules agreed (`architecture.md` section 12). Every command was audited; the results are phase 3b
   (existing commands) and the automation notes in phases 4–9 (new commands).
 - 2026-09-26: the design moved from `CLAUDE.md` into `architecture.md`, restoring sections accidentally deleted in commit `356d186`.
+- Phase 3b discussed and agreed (2026-09-26).
 - **Next step:** plan phase 3b in plan mode, then implement. Then phase 4 (hostnames and paths).
 - Testing (phase 1) waits until the scripts are written, as the user asked.
   Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
@@ -147,7 +148,8 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] 3b.1 Shared helpers: `need_flags` (collect every missing flag, then one error with exit 3), a summary/confirm helper,
       `--secrets-stdin` reader (JSON object on stdin, keys like `glowroot_password`; see `architecture.md` section 12), and "no terminal: add -y" (exit 3)
 - [ ] 3b.2 `dhis2-create-instance`:
-  - first question: 1) create and deploy DHIS2 2) create only (`--no-deploy`)
+  - first question: 1) create and deploy DHIS2 2) create only (`--no-deploy`); create only asks the version line (`--line 2.42`)
+    to choose Ubuntu/Tomcat/Java
   - "where does DHIS2 come from": 1) official release (`-V`) 2) own war file (`-f`) 3) own war at a URL (`-l`)
     - own war: its release is read from `dhis-api-*.jar` and decides Ubuntu/tomcat/java. If it can't be read, ask which version it is
       based on (`--based-on 2.41`) and record the version as `custom`. Optional `--sha256`.
@@ -163,7 +165,8 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   - `--based-on`, `--sha256`, and "choose another release" on a checksum failure
   - summary + confirm, `--dry-run`
 - [ ] 3b.4 `dhis2-delete-instance`: `--dry-run` (lists everything that would be removed), `--postgres`, "add -y" without a terminal, errors to stderr
-- [ ] 3b.5 `dhis2-restoredb`: `--dry-run`, `--postgres` (no longer hardcoded; from phase 6 the default comes from the instance's
+- [ ] 3b.5 `dhis2-restoredb`: summary; when the database belongs to an instance, stop its Tomcat, restore, start it again
+      (shown in the summary); `--dry-run`, `--postgres` (no longer hardcoded; from phase 6 the default comes from the instance's
       `user.dhis2.postgres` label), "add -y" without a terminal
 - [ ] 3b.6 `dhis2-dbactivity --json`, `--postgres`
 - [ ] 3b.7 `dhis2-logview`: **security fix**. The `-g` text currently goes through a shell as root in the container.
@@ -178,6 +181,8 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] 3b.11 `dhis2-tools-update --check --json` → `{"current", "latest", "update_available"}`
 - [ ] 3b.12 `dhis2-glowroot-login` / `dhis2-munin-login`: `--dry-run` (which instances would change and restart)
 - [ ] 3b.13 `dhis2-tomcat-munin`: stop at the first failure and exit non-zero
+- [ ] 3b.16 Every short flag also gets a long name, both in `-h` (`-V`/`--release`, `-g`/`--glowroot`, `-m`/`--munin`, ...)
+- Order (agreed): 3b.1 helpers → 3b.2 create-instance, 3b.3 deploy-war → security fixes 3b.7 logview, 3b.9 ssl-setup → the rest.
 - [ ] 3b.15 `--password-stdin` → `--secrets-stdin` in `dhis2-create-instance`, `dhis2-glowroot-login`, `dhis2-munin-login`;
       `-U` → `--glowroot-user` / `--munin-user` (keep `-U` as a short form)
 
