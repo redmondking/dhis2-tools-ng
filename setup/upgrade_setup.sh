@@ -34,7 +34,7 @@ confirm() {
 }
 
 # the postgres12 container type was removed (it was identical to postgres); rename it before the config is read
-sed -i 's/"type": *"postgres12"/"type": "postgres"/' /usr/local/etc/dhis/containers.json
+sed -i -E 's/("type"[[:space:]]*:[[:space:]]*)"postgres12"/\1"postgres"/' /usr/local/etc/dhis/containers.json
 
 source parse_config.sh
 source lib/dhis2-lib.sh
