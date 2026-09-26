@@ -144,7 +144,7 @@ Requirements agreed with the user on 2026-09-26.
 Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New commands follow the rules when they are built (flags listed in their phase below).
 
 - [ ] 3b.1 Shared helpers: `need_flags` (collect every missing flag, then one error with exit 3), a summary/confirm helper,
-      a password-file reader (see the secrets rule in `CLAUDE.md`), and "no terminal: add -y" (exit 3)
+      `--secrets-stdin` reader (JSON object on stdin, keys like `glowroot_password`; see `CLAUDE.md`), and "no terminal: add -y" (exit 3)
 - [ ] 3b.2 `dhis2-create-instance`:
   - first question: 1) create and deploy DHIS2 2) create only (`--no-deploy`)
   - "where does DHIS2 come from": 1) official release (`-V`) 2) own war file (`-f`) 3) own war at a URL (`-l`)
@@ -176,6 +176,8 @@ Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New command
 - [ ] 3b.11 `dhis2-tools-update --check --json` → `{"current", "latest", "update_available"}`
 - [ ] 3b.12 `dhis2-glowroot-login` / `dhis2-munin-login`: `--dry-run` (which instances would change and restart)
 - [ ] 3b.13 `dhis2-tomcat-munin`: stop at the first failure and exit non-zero
+- [ ] 3b.15 `--password-stdin` → `--secrets-stdin` in `dhis2-create-instance`, `dhis2-glowroot-login`, `dhis2-munin-login`;
+      `-U` → `--glowroot-user` / `--munin-user` (keep `-U` as a short form)
 
 ## Phase 4 – Hostnames and paths
 

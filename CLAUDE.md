@@ -61,11 +61,15 @@ Agreed with the user 2026-09-26. Existing commands are brought in line in phase 
   If anything is missing, the command stops **before changing anything** and lists **all** missing flags in one error (exit 3).
 - Without `-y` and without a terminal, nothing can be asked, including a confirmation. The command stops and says to add `-y` (exit 3).
   Automation therefore always passes `-y`, and nothing ever hangs.
-- Secrets never go in argv (visible in `ps`):
-  - one secret: `--password-stdin` (like `docker login`)
-  - several secrets in one command: **pending the user's answer**. Proposed: one `--<what>-password-file <file|->` flag per secret
-    (`-` = stdin), e.g. `--glowroot-password-file`, `--admin-password-file`. JSON on stdin was rejected (too cumbersome for people).
-  - install: inside the `--config` JSON
+- Secrets (agreed 2026-09-26):
+  - **People** are asked for passwords interactively on a terminal (typed twice). Passwords are never flags.
+  - **Automation** passes them as a JSON object on stdin with `--secrets-stdin`. Keys are named after what they are for:
+    `glowroot_password`, `munin_password`, `dhis2_password` (and later e.g. cloud storage keys for remote backups).
+    Example: `echo '{"glowroot_password": "…"}' | sudo dhis2-glowroot-login --secrets-stdin -y`
+  - The same for single-secret commands (no separate `--password-stdin`), so there is one style everywhere.
+  - Never in argv: `sudo` logs full command lines to `/var/log/auth.log`, and they also end up in shell history, `ps` and automation logs.
+  - Install: inside the `--config` JSON.
+  - Usernames are normal flags: `--glowroot-user`, `--munin-user`, `--dhis2-user` (default `admin`).
 
 **Before changing anything**
 - A command that changes things shows a **summary** of what it will do. On a terminal it asks to confirm; `-y` skips that.
