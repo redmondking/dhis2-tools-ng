@@ -9,6 +9,8 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 - Branch `develop`, nothing pushed. `master` is still the original code (`a37e7db`).
 - Phases 0 and 2 are written and committed. Nothing has been tested on a real server yet: all `[~]`.
+- **First, a fix:** 8.3 must be done before testing. Phase 2 deleted the `postgres12` type, and `parse_config.sh` stops on unknown types.
+  So on existing servers whose `containers.json` says `postgres12`, `dhis2-upgrade-setup` and `dhis2-ssl-setup` would stop.
 - **Next step:** discuss and agree the phase 3 requirements (multiple DHIS2 versions, Tomcat 9/10 per instance, task 3.0),
   then make the plan in plan mode (see the Workflow section in `CLAUDE.md`).
 - Testing (phase 1) waits until the scripts are written, as the user asked.
@@ -98,7 +100,7 @@ Moved: 2.4 (Tomcat per instance) → 3.0; 2.11 (switch apache servers to nginx) 
   - `dhis2-tomcat-munin`
   - `dhis2-glowroot-login`
   - `upgrade_setup.sh`
-- [ ] 3.1 Shared helpers for the service scripts:
+- [ ] 3.1 Shared helpers for the service scripts (partly done in 2.13: `ask`, `ask_yes_no`, `ask_password`, `die`; still to do: feed and labels):
   - read the release feed
   - prompts with defaults (`ask`, `menu`, `confirm`)
   - read and write the `user.dhis2.*` labels
@@ -235,7 +237,8 @@ Testing: connect ✓  write ✓  delete test file ✓
   - `version` = read from the deployed war
   - `tomcat` = `tomcat9`
 - [ ] 8.2 Move proxy config to the per-hostname layout
-- [ ] 8.3 `containers.json` type `postgres12` → `postgres`
+- [ ] 8.3 `containers.json` type `postgres12` → `postgres`. **Needed before testing**: it must run in `upgrade_setup.sh` before `parse_config.sh`
+      is sourced, because phase 2 deleted the `postgres12` type and `parse_config.sh` stops on unknown types
 - [ ] 8.4 Optional PostgreSQL 13 → 16 upgrade, with a checked backup first
 - [ ] 8.5 Keep existing `dhis2-env` backup settings, only adding new keys
 - [ ] 8.6 Move existing backups into the new layout: `backup<date>-<type>/<db>.sql.gz*` → `<db>/<date>-<type>/`.
