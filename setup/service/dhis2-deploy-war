@@ -1,74 +1,123 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #       ____  __  ______________
 #      / __ \/ / / /  _/ ___/__ \
 #     / / / / /_/ // / \__ \__/ /
 #    / /_/ / __  // / ___/ / __/
 #   /_____/_/ /_/___//____/____/
 #
-#   DHIS2 war deployment
+#   Deploy a DHIS2 release (or a custom war) to an existing instance
 
-set -e
-
-PROG=`basename $0`
-TEMPWAR=/tmp/dhis.war
+PROG=$(basename "$0")
+source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
 
 usage() {
   echo "Usage: $PROG [options] <instance>"
-  echo "  instance: name of the instance to deploy to"
+  echo "  Without -l or -f the release comes from the official DHIS2 list, within the instance's version (e.g. 2.42.x)."
+  echo "  Changing to another DHIS2 version (e.g. 2.41 -> 2.42) is not done here."
   echo "Options:"
-  echo "  -l        http/https URL of war file to deploy"
-  echo "  -f        file path to war file to deploy"
-  echo "  -h, --help       Display this help message"
+  echo "  -V <release>  DHIS2 release, exact name from the list (e.g. 2.42.6); asked on a terminal"
+  echo "  -l <url>      Download a custom war from this URL (no checksum check)"
+  echo "  -f <file>     Deploy a custom war file (no checksum check)"
+  echo "  --force       Allow going back to an older release of the same version"
+  echo "  -y            Do not ask for confirmation (going back also needs --force)"
+  echo "  -h, --help    Display this help message"
+  exit "${1:-1}"
 }
 
-while getopts :l:f:h opt;
-do
-  case $opt in
-    f)
-      cp $OPTARG $TEMPWAR;
-      break;
-      ;;
-    l)
-      SOURCE=$OPTARG
-      ;;
-    \?)
-       echo "Invalid option -$opt" >&2
-       usage; exit 1;;
-    :)
-       echo "Option -$opt requires an argument." >&2
-       usage; exit 1;;
-    h) usage; exit 1;;
+[[ $EUID -eq 0 ]] || die "please run with sudo"
 
+V_OPT=""
+URL=""
+FILE=""
+FORCE=false
+YES=false
+INSTANCE=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -V) V_OPT=$2; shift ;;
+    -l) URL=$2; shift ;;
+    -f) FILE=$2; shift ;;
+    --force) FORCE=true ;;
+    -y) YES=true ;;
+    -h|--help) usage 0 ;;
+    -*) die "unknown option $1" ;;
+    *) [[ -z $INSTANCE ]] || usage; INSTANCE=$1 ;;
   esac
+  shift
 done
+[[ -n $INSTANCE ]] || usage
+N=0
+for X in "$V_OPT" "$URL" "$FILE"; do [[ -n $X ]] && N=$((N + 1)); done
+(( N <= 1 )) || die "use only one of -V, -l and -f"
+lxc info "$INSTANCE" >/dev/null 2>&1 || die "no such instance: $INSTANCE"
 
-shift $(( $OPTIND-1 ))
-
-if [ "$#" -ne 1 ]; then
-  usage
-  exit 1
+TOMCAT=$(instance_tomcat "$INSTANCE")
+CURRENT=$(lxc config get "$INSTANCE" user.dhis2.version)
+[[ $CURRENT =~ ^2\.[0-9]+\.[0-9] ]] || CURRENT=""   # none, custom or no label: not known
+if [[ -n $CURRENT ]] && (( $(release_line "$CURRENT" | cut -d. -f2) < OLDEST_LINE )); then
+  die "$INSTANCE runs $CURRENT, older than 2.$OLDEST_LINE, the oldest version these tools deploy"
 fi
 
-INSTANCE=$1
+WARDIR=$(mktemp -d -p /var/tmp dhis2-war.XXXXXX)
+trap 'rm -rf "$WARDIR"' EXIT
 
-# download war file if we don't have it
-test -f $TEMPWAR || wget -O $TEMPWAR $SOURCE  || exit 1
-unzip -t -q $TEMPWAR || { echo "Corrupt war file: $TEMPWAR"; exit 1; }
+# check_release RELEASE: stop unless the instance may move to RELEASE
+check_release() {
+  local new=$1 needs answer
+  needs=$(tomcat_for_line "$(release_line "$new")")
+  [[ $needs == "$TOMCAT" ]] || die "$new needs $needs, but $INSTANCE runs $TOMCAT"
+  [[ -z $CURRENT ]] && return 0
+  [[ $(release_line "$new") == "$(release_line "$CURRENT")" ]] \
+    || die "$INSTANCE runs $CURRENT: changing to another DHIS2 version ($(release_line "$new")) is done with the upgrade script, which is not available yet"
+  if [[ $new == "$CURRENT" ]]; then
+    [[ $YES == true ]] || ask_yes_no "$INSTANCE already runs $new. Install it again?" n \
+      || die "not installed again (use -y to reinstall without a terminal)"
+  elif release_older "$new" "$CURRENT"; then
+    [[ $FORCE == true ]] || die "$new is older than $CURRENT, which $INSTANCE runs now. Going back is refused unless you add --force"
+    cat >&2 <<EOF
+WARNING: going back from $CURRENT to $new on $INSTANCE.
+DHIS2 releases can change the database, and older code may not work with it or may damage data.
+The safe way back is to restore a backup taken while $INSTANCE ran $new.
+EOF
+    if [[ -t 0 ]]; then
+      read -r -p "Type the instance name ($INSTANCE) to go back anyway: " answer
+      [[ $answer == "$INSTANCE" ]] || die "not confirmed, nothing changed"
+    else
+      [[ $YES == true ]] || die "without a terminal, going back needs --force and -y"
+    fi
+  fi
+}
 
-lxc exec $1 -- service tomcat9 stop
-# give it a chance to shutdown
-sleep 3
+if [[ -n $URL || -n $FILE ]]; then
+  # custom war: no published checksum, but the release inside it is still checked when it can be read
+  if [[ -n $URL ]]; then
+    curl -fL --progress-bar -o "$WARDIR/dhis.war" "$URL" || die "download failed: $URL"
+  else
+    [[ -f $FILE ]] || die "no such file: $FILE"
+    cp "$FILE" "$WARDIR/dhis.war"
+  fi
+  unzip -tqq "$WARDIR/dhis.war" >/dev/null 2>&1 || die "not a valid war file"
+  RELEASE=$(war_release "$WARDIR/dhis.war")
+  if [[ -n $RELEASE ]]; then
+    echo "The war contains DHIS2 $RELEASE (a custom war, so there is no published checksum to check)"
+    check_release "$RELEASE"
+  else
+    echo "Could not tell which DHIS2 release this war contains; it will be recorded as 'custom'"
+    [[ $YES == true ]] || ask_yes_no "Deploy it to $INSTANCE?" y || die "nothing changed"
+    RELEASE=custom
+  fi
+else
+  feed_load
+  if [[ -n $CURRENT ]]; then
+    ask_release RELEASE "$(release_line "$CURRENT")" "$CURRENT" "$V_OPT"
+  else
+    [[ -t 0 && -z $V_OPT ]] && echo "$INSTANCE has no recorded DHIS2 version, so every release is listed" >&2
+    ask_release RELEASE "" "" "$V_OPT"
+  fi
+  check_release "$RELEASE"
+  download_war "$WARDIR" || die "could not get a verified download of DHIS2 $RELEASE; nothing changed"
+fi
 
-echo "Deploying new war file"
-# clean out existing webapp
-echo 'rm -rf /var/lib/tomcat9/webapps/*' | lxc exec $INSTANCE -- bash
-lxc file push $TEMPWAR $INSTANCE/.
-lxc exec $INSTANCE -- mkdir /var/lib/tomcat9/webapps/$INSTANCE
-lxc exec $INSTANCE -- unzip -q -d /var/lib/tomcat9/webapps/$INSTANCE /dhis.war
-lxc exec $INSTANCE -- rm /dhis.war
-lxc exec $INSTANCE -- service tomcat9 start
-echo "$INSTANCE container starting"
-
-rm $TEMPWAR || echo "Warning $TEMPWAR not deleted.  Please delete manually."
-
-
+echo "Deploying DHIS2 $RELEASE to $INSTANCE"
+deploy_war "$INSTANCE" "$WARDIR/dhis.war" "$RELEASE"
+echo "$INSTANCE: DHIS2 $RELEASE is starting at $(server_base_url)/$INSTANCE (this takes a few minutes)"
