@@ -8,12 +8,13 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 ## Where we are (2026-09-26)
 
 - Branch `develop`, nothing pushed. `master` is still the original code (`a37e7db`).
-- Phases 0, 2 and 3 are written and committed. Nothing has been tested on a real server yet: all `[~]`.
+- Phases 0, 2, 3 and 3b are written and committed. Nothing has been tested on a real server yet: all `[~]`.
 - Command and flag rules agreed (`architecture.md` section 12). Every command was audited; the results are phase 3b
   (existing commands) and the automation notes in phases 4–9 (new commands).
 - 2026-09-26: the design moved from `CLAUDE.md` into `architecture.md`, restoring sections accidentally deleted in commit `356d186`.
-- Phase 3b discussed and agreed (2026-09-26).
-- **Next step:** plan phase 3b in plan mode, then implement. Then phase 4 (hostnames and paths).
+- Phase 3b is done (all `[~]`) except 3b.17, a bug found on the way (`dhis2-ssl-setup` carries on after certbot fails), which
+  still needs to be agreed.
+- **Next step:** agree 3b.17 with the user, then phase 4 (hostnames and paths): discuss, then plan in plan mode.
 - Testing (phase 1) waits until the scripts are written, as the user asked.
   Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
 - Until `develop` is merged, install on the test server with
