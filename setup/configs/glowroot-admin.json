@@ -1,12 +1,5 @@
 {
-  "users": [
-    {
-      "username": "anonymous",
-      "roles": [
-        "Administrator"
-      ]
-    }
-  ],
+  "users": [],
   "roles": [
     {
       "name": "Administrator",
@@ -23,7 +16,7 @@
   "web": {
     "port": 4000,
     "bindAddress": "0.0.0.0",
-    "contextPath": "/XXXX-glowroot",
+    "contextPath": "/INSTANCE-glowroot",
     "sessionTimeoutMinutes": 30,
     "sessionCookieName": "GLOWROOT_SESSION_ID"
   },

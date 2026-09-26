@@ -9,7 +9,6 @@
 
 PROG=`basename $0`
 
-APM=$(cat /usr/local/etc/dhis/containers.json| jq -r .apm)
 PROXY=$(cat /usr/local/etc/dhis/containers.json| jq -r .proxy)
 
 ###############################################################
@@ -49,19 +48,11 @@ fi
 
 if [[ $PROXY == "nginx" ]];
 then
-  lxc exec proxy -- rm -f /etc/nginx/upstream/${NAME}.conf
-  if [[ $APM == "glowroot" ]]; 
-  then
-    lxc exec proxy -- rm -f /etc/nginx/upstream/${NAME}-glowroot.conf
-  fi
+  lxc exec proxy -- rm -f /etc/nginx/upstream/${NAME}.conf /etc/nginx/upstream/${NAME}-glowroot.conf
   lxc exec proxy -- service nginx restart
 elif [[ $PROXY == "apache2" ]];
 then
-  lxc exec proxy -- rm -f /etc/apache2/upstream/${NAME}
-  if [[ $APM == "glowroot" ]]; 
-  then
-    lxc exec proxy -- rm -f /etc/apache2/upstream/${NAME}-glowroot
-  fi
+  lxc exec proxy -- rm -f /etc/apache2/upstream/${NAME} /etc/apache2/upstream/${NAME}-glowroot
   lxc exec proxy -- service apache2 restart
 else
   echo "Error: Proxy type not supported"

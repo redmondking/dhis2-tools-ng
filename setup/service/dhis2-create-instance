@@ -8,47 +8,62 @@
 #   Script to deploy a dhis2 instance
 
 PROG=$(basename "$0")
+source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
+
+CONF=/usr/local/etc/dhis/containers.json
 CREATEDB=true
 TOMCAT_SETUP=/usr/local/etc/dhis/tomcat_setup
-GLOWROOT_SETUP=/usr/local/etc/dhis/glowroot-admin.json
-GLOWROOT_VERSION=0.14.2
+GLOWROOT_VERSION=0.14.7
 
-APM=$(cat /usr/local/etc/dhis/containers.json| jq -r .apm)
-PROXY=$(cat /usr/local/etc/dhis/containers.json| jq -r .proxy)
-PROXY_IP=$(cat /usr/local/etc/dhis/containers.json| jq -r '.containers[] | select(.name=="proxy") | .ip')
+APM=$(jq -r .apm $CONF)
+PROXY=$(jq -r .proxy $CONF)
+PROXY_IP=$(jq -r '.containers[] | select(.name=="proxy") | .ip' $CONF)
+MONITORING=$(jq -r .monitoring $CONF)
+GLOWROOT_LOGIN=$(jq -r '.glowroot_login // "own"' $CONF)
 JAVA_VERSION="11"
 
 GUESTOS=20.04
 
 ###############################################################
 usage() {
-  echo "Usage: $PROG [options] <instance> -j [<java_version>] [<ip>] [<postgres_container>]"
+  echo "Usage: $PROG [options] <instance> [<ip>] [<postgres_container>]"
   echo "  instance: name of the dhis2 instance to create"
   echo "  ip: the ip address of the container (default picks next free IP ending in .10 to .19"
   echo "  postgres_container: the name of postgresql container (default postgres)"
   echo "Options:"
-  echo "  -h, --help       Display this help message"
-  echo "  -n               Do NOT create database for instance"
-  echo "  -j <8|11|17>        Java version. Default is 11"
-  exit 1
+  echo "  -h, --help        Display this help message"
+  echo "  -n                Do NOT create database for instance"
+  echo "  -j <8|11|17>      Java version. Default is 11"
+  echo "  -g <yes|no>       Install Glowroot (default from containers.json \"apm\", asked on a terminal)"
+  echo "  -m <yes|no>       Monitor with Munin (only when Munin is installed; default yes)"
+  echo "  -U <username>     Glowroot username (default admin)"
+  echo "  --password-stdin  Read the Glowroot password from stdin"
+  exit "${1:-1}"
 }
 
-# main entry point
-echo "Checking options..."
-while getopts p:nhj: opt
-do
-  case $opt in
-    n) CREATEDB=false ;;
-    j) JAVA_VERSION="${OPTARG}"
-       [[ $JAVA_VERSION == "8" || $JAVA_VERSION == "11" || $JAVA_VERSION == "17" ]] || usage
-       ;;
-    h) usage;;
-    *) echo "Error: Unknown parameter '$OPTARG'."
-      exit 1;;
+GLOWROOT=""
+MUNIN=""
+GR_USER_OPT=""
+PASSWORD_STDIN=false
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -n) CREATEDB=false ;;
+    -j) JAVA_VERSION=$2; shift
+        [[ $JAVA_VERSION =~ ^(8|11|17)$ ]] || usage ;;
+    -g) GLOWROOT=$2; shift
+        [[ $GLOWROOT =~ ^(yes|no)$ ]] || usage ;;
+    -m) MUNIN=$2; shift
+        [[ $MUNIN =~ ^(yes|no)$ ]] || usage ;;
+    -U) GR_USER_OPT=$2; shift ;;
+    --password-stdin) PASSWORD_STDIN=true ;;
+    -h|--help) usage 0 ;;
+    -*) die "unknown option $1" ;;
+    *) ARGS+=("$1") ;;
   esac
+  shift
 done
-
-shift $(($OPTIND - 1))
+set -- "${ARGS[@]}"
 
 if [ "$#" -lt 1 ]; then
   usage
@@ -87,6 +102,30 @@ if grep -qx "$IP" <<< "$USED";
 then
   echo "$IP already in use"
   exit 1
+fi
+
+# Monitoring choices, asked before anything is created
+if [[ -z $GLOWROOT ]]; then
+  [[ $APM == glowroot ]] && DEFAULT=y || DEFAULT=n
+  ask_yes_no "Install Glowroot on $NAME?" $DEFAULT && GLOWROOT=yes || GLOWROOT=no
+fi
+if [[ $MONITORING != munin ]]; then
+  MUNIN=no
+elif [[ -z $MUNIN ]]; then
+  ask_yes_no "Monitor $NAME with Munin?" y && MUNIN=yes || MUNIN=no
+fi
+if [[ $GLOWROOT == yes ]]; then
+  if [[ $GLOWROOT_LOGIN == shared ]]; then
+    if ! glowroot_load_shared; then
+      [[ -t 0 || $PASSWORD_STDIN == true ]] || die "there is no shared Glowroot login yet: set it with dhis2-glowroot-login"
+      echo "Set the shared Glowroot login, used by every instance on this server"
+      glowroot_new_login "$GR_USER_OPT" $PASSWORD_STDIN
+      glowroot_save_shared
+    fi
+  else
+    echo "Glowroot login for $NAME"
+    glowroot_new_login "$GR_USER_OPT" $PASSWORD_STDIN
+  fi
 fi
 
 if [[ $CREATEDB == true ]]
@@ -181,27 +220,19 @@ JAVA_ARCH=$(lxc exec $NAME -- dpkg --print-architecture)
 sed -e "s/{{ JAVA_VERSION }}/${JAVA_VERSION}/" -e "s/JAVA_VERSION/${JAVA_VERSION}/" \
     -e "s/JAVA_ARCH/${JAVA_ARCH}/" /usr/local/etc/dhis/tomcat_default > /tmp/tomcat9
 
-if [[ $APM == "glowroot" ]]; 
+if [[ $GLOWROOT == yes ]]
 then
   sed -ri '/glowroot.jar/ s/..(.*)/\1/' /tmp/tomcat9
 
-  if [[ $JAVA_VERSION == "17" ]]; then
-    GLOWROOT_DOWNLOAD_URL="https://github.com/glowroot/glowroot/releases/download/v$GLOWROOT_VERSION/glowroot-$GLOWROOT_VERSION-dist.zip"
-    GLOWROOT_ZIP="glowroot-$GLOWROOT_VERSION-dist.zip"
-  else
-    GLOWROOT_DOWNLOAD_URL="https://github.com/glowroot/glowroot/releases/download/v0.13.6/glowroot-0.13.6-dist.zip"
-    GLOWROOT_ZIP="glowroot-0.13.6-dist.zip"
-  fi
-
-  # Download the appropriate Glowroot version
-  lxc exec $NAME -- wget -P /opt $GLOWROOT_DOWNLOAD_URL
-  lxc exec $NAME -- unzip -o /opt/$GLOWROOT_ZIP -d /opt
-  sed "s/XXXX/${NAME}/" $GLOWROOT_SETUP > /tmp/glowroot-admin.json
-  lxc file push /tmp/glowroot-admin.json $NAME/opt/glowroot/admin.json
-  lxc exec $NAME -- chown -R tomcat.tomcat /opt/
+  GLOWROOT_ZIP=glowroot-$GLOWROOT_VERSION-dist.zip
+  lxc exec $NAME -- wget -q -P /opt https://github.com/glowroot/glowroot/releases/download/v$GLOWROOT_VERSION/$GLOWROOT_ZIP
+  lxc exec $NAME -- unzip -o -q /opt/$GLOWROOT_ZIP -d /opt
+  lxc exec $NAME -- rm /opt/$GLOWROOT_ZIP
+  lxc exec $NAME -- chown -R tomcat:tomcat /opt/glowroot
+  glowroot_write_admin $NAME $GLOWROOT_LOGIN
   lxc exec $NAME ufw allow proto tcp from $PROXY_IP to any port 4000
-
-  rm /tmp/glowroot-admin.json
+else
+  lxc config set $NAME user.dhis2.glowroot off
 fi
 lxc file push /tmp/tomcat9 $NAME/etc/default/tomcat9
 rm /tmp/tomcat9
@@ -249,7 +280,7 @@ EOF
   lxc file push /tmp/${NAME}.conf proxy/etc/nginx/upstream/${NAME}.conf
   rm /tmp/${NAME}.conf
   
-  if [[ $APM == "glowroot" ]]; 
+  if [[ $GLOWROOT == yes ]]
   then
     cat <<EOF > /tmp/${NAME}-glowroot.conf
     # Proxy pass to servlet container
@@ -297,7 +328,7 @@ EOF
   lxc file push /tmp/${NAME} proxy/etc/apache2/upstream/${NAME}
   rm /tmp/${NAME}
   
-  if [[ $APM == "glowroot" ]]; 
+  if [[ $GLOWROOT == yes ]]
   then
     cat <<EOF > /tmp/${NAME}-glowroot
   <Location /${NAME}-glowroot>
@@ -316,3 +347,8 @@ else
   echo "Error: Proxy type not supported"
   exit 1
 fi
+
+if [[ $MUNIN == yes ]]; then
+  "$(dirname "$(readlink -f "$0")")/dhis2-tomcat-munin" $NAME
+fi
+lxc config set $NAME user.dhis2.munin $MUNIN

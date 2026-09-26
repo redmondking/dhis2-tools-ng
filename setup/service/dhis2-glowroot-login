@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+#       ____  __  ______________
+#      / __ \/ / / /  _/ ___/__ \
+#     / / / / /_/ // / \__ \__/ /
+#    / /_/ / __  // / ___/ / __/
+#   /_____/_/ /_/___//____/____/
+#
+#   Set the Glowroot login: the shared one used by all instances, or one instance's own
+
+PROG=$(basename "$0")
+source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
+
+usage() {
+  echo "Usage: $PROG [options] [<instance>]"
+  echo "  (no instance)  set the shared login, and update every instance that uses it"
+  echo "  instance       give this instance its own login"
+  echo "Options:"
+  echo "  -U <username>     Glowroot username (default admin)"
+  echo "  --password-stdin  Read the password from stdin"
+  echo "  -y                Restart the affected instances without asking (Glowroot reads its login at startup)"
+  echo "  -h, --help        Display this help message"
+  exit "${1:-1}"
+}
+
+[[ $EUID -eq 0 ]] || die "please run with sudo"
+
+GR_USER_OPT=""
+PASSWORD_STDIN=false
+YES=false
+INSTANCE=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -U) GR_USER_OPT=$2; shift ;;
+    --password-stdin) PASSWORD_STDIN=true ;;
+    -y) YES=true ;;
+    -h|--help) usage 0 ;;
+    -*) die "unknown option $1" ;;
+    *) [[ -z $INSTANCE ]] || usage; INSTANCE=$1 ;;
+  esac
+  shift
+done
+
+if [[ -n $INSTANCE ]]; then
+  [[ $(lxc config get "$INSTANCE" user.dhis2.glowroot 2>/dev/null) =~ ^(shared|own)$ ]] \
+    || die "$INSTANCE does not exist or has no Glowroot"
+  [[ $(lxc list -c s --format csv "^${INSTANCE}\$") == RUNNING ]] || die "$INSTANCE is not running"
+  echo "Glowroot login for $INSTANCE"
+  glowroot_new_login "$GR_USER_OPT" $PASSWORD_STDIN
+  glowroot_write_admin "$INSTANCE" own
+  AFFECTED=("$INSTANCE")
+else
+  echo "Shared Glowroot login, used by every instance set to the shared login"
+  glowroot_new_login "$GR_USER_OPT" $PASSWORD_STDIN
+  glowroot_save_shared
+  AFFECTED=()
+  for C in $(lxc list -c n --format csv); do
+    [[ $(lxc config get "$C" user.dhis2.glowroot) == shared ]] || continue
+    if [[ $(lxc list -c s --format csv "^${C}\$") != RUNNING ]]; then
+      echo "$C: not running, run this again once it is started"
+      continue
+    fi
+    glowroot_write_admin "$C" shared
+    AFFECTED+=("$C")
+  done
+fi
+
+[[ ${#AFFECTED[@]} -gt 0 ]] || { echo "No instances to update"; exit 0; }
+echo "Updated: ${AFFECTED[*]}"
+echo "Glowroot reads its login at startup, so the new login works after tomcat restarts."
+if [[ $YES == true ]] || ask_yes_no "Restart tomcat on ${AFFECTED[*]} now? DHIS2 will be down for a few minutes" n; then
+  for C in "${AFFECTED[@]}"; do
+    echo "Restarting $C"
+    lxc exec "$C" -- service tomcat9 restart
+  done
+else
+  echo "Not restarted: the old login stays in use until the next restart"
+fi

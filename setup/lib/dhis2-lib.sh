@@ -69,3 +69,55 @@ salt = os.urandom(16)
 b64 = lambda b: base64.b64encode(b).decode().rstrip("=")
 print(b64(hashlib.pbkdf2_hmac("sha1", password, salt, 500000, 16)) + ":" + b64(salt) + ":500000")'
 }
+
+########################################################################
+# Glowroot logins
+#
+# Every instance with Glowroot has one login managed by these tools (its username is kept in the
+# container label user.dhis2.glowroot.user). Other users added in Glowroot's own admin screens are kept.
+# Mode "shared": one login for all instances, stored as a hash in $GLOWROOT_LOGIN_FILE.
+# Mode "own": each instance has its own login. The instance's mode is in label user.dhis2.glowroot.
+
+DHIS2_TOOLS=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+GLOWROOT_LOGIN_FILE=/usr/local/etc/dhis/glowroot-login
+
+# glowroot_new_login USERNAME FROM_STDIN -> sets GR_USER, GR_HASH
+# USERNAME empty: ask for it (default admin).
+glowroot_new_login() {
+  local password
+  if [[ -n $1 ]]; then GR_USER=$1; else ask GR_USER "Glowroot username" admin -U; fi
+  ask_password password Glowroot "${2:-false}"
+  GR_HASH=$(printf '%s\n' "$password" | glowroot_hash)
+}
+
+# glowroot_load_shared -> sets GR_USER, GR_HASH from the shared login; returns 1 if there is none yet
+glowroot_load_shared() {
+  [[ -f $GLOWROOT_LOGIN_FILE ]] || return 1
+  GR_USER=$(jq -r .username "$GLOWROOT_LOGIN_FILE")
+  GR_HASH=$(jq -r .passwordHash "$GLOWROOT_LOGIN_FILE")
+}
+
+glowroot_save_shared() {
+  ( umask 077; jq -n --arg u "$GR_USER" --arg h "$GR_HASH" '{username: $u, passwordHash: $h}' > "$GLOWROOT_LOGIN_FILE" )
+}
+
+# glowroot_write_admin NAME MODE: put GR_USER/GR_HASH into the instance's /opt/glowroot/admin.json.
+# Removes the anonymous user and the previously managed login; a new instance starts from the template.
+# Glowroot only reads admin.json at startup, so tomcat must be restarted afterwards.
+glowroot_write_admin() {
+  local name=$1 mode=$2 tmp previous
+  tmp=$(mktemp)
+  previous=$(lxc config get "$name" user.dhis2.glowroot.user)
+  if ! lxc file pull "$name/opt/glowroot/admin.json" "$tmp" 2>/dev/null; then
+    jq --arg ctx "/$name-glowroot" '.web.contextPath = $ctx' "$DHIS2_TOOLS/configs/glowroot-admin.json" > "$tmp"
+  fi
+  jq --arg u "$GR_USER" --arg h "$GR_HASH" --arg prev "$previous" \
+    '.users = ([.users[]? | select(.username != "anonymous" and .username != $u and .username != $prev)]
+               + [{username: $u, passwordHash: $h, roles: ["Administrator"]}])' "$tmp" > "$tmp.new"
+  lxc file push "$tmp.new" "$name/opt/glowroot/admin.json"
+  rm -f "$tmp" "$tmp.new"
+  lxc exec "$name" -- chown tomcat:tomcat /opt/glowroot/admin.json
+  lxc exec "$name" -- chmod 600 /opt/glowroot/admin.json
+  lxc config set "$name" user.dhis2.glowroot "$mode"
+  lxc config set "$name" user.dhis2.glowroot.user "$GR_USER"
+}
