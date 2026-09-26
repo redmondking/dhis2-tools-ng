@@ -20,8 +20,8 @@ cd "$(dirname "$(readlink -f "$0")")" || exit 1
 YES=false
 [[ $1 == "-y" || ! -t 0 ]] && YES=true
 
-# ask "question" [default y|n]
-ask() {
+# confirm "question" [default y|n]
+confirm() {
   local DEFAULT=${2:-y} ANSWER
   if [[ $YES == true && $DEFAULT == y ]]; then return 0; fi
   if [[ $DEFAULT == y ]]; then
@@ -34,6 +34,10 @@ ask() {
 }
 
 source parse_config.sh
+source lib/dhis2-lib.sh
+CONF=/usr/local/etc/dhis/containers.json
+RESTART=()           # instances that need a tomcat restart, asked about at the end
+GLOWROOT_PENDING=()  # of those, the ones whose Glowroot stays open until then
 
 ########################################################################
 echo
@@ -46,7 +50,7 @@ for F in /usr/local/bin/dhis2-*; do
 done
 if [[ -z $OLD_COPIES ]]; then
   echo "Already links"
-elif echo "Old copies:$OLD_COPIES" && ask "Replace them with links to the installed versions (the old files are kept in /usr/local/etc/dhis/old-scripts)?"; then
+elif echo "Old copies:$OLD_COPIES" && confirm "Replace them with links to the installed versions (the old files are kept in /usr/local/etc/dhis/old-scripts)?"; then
   mkdir -p /usr/local/etc/dhis/old-scripts
   for F in $OLD_COPIES; do mv "/usr/local/bin/$F" /usr/local/etc/dhis/old-scripts/; done
   echo "Moved"
@@ -68,11 +72,7 @@ for ROW in $(lxc list -c ns --format csv); do
   JH=$(lxc exec "$C" -- sh -c 'dirname "$(dirname "$(readlink -f "$(command -v java)")")"')
   echo "$C: JAVA_HOME is broken, setting it to $JH"
   lxc exec "$C" -- sed -i "s|^JAVA_HOME=.*|JAVA_HOME=\"$JH/\"|" /etc/default/tomcat9
-  if ask "$C: restart tomcat now so the fix takes effect (DHIS2 will be down for a few minutes)?" n; then
-    lxc exec "$C" -- service tomcat9 restart
-  else
-    echo "$C: fix applies on the next tomcat restart"
-  fi
+  RESTART+=("$C")
 done
 
 ########################################################################
@@ -95,7 +95,7 @@ else
     lxc exec proxy -- sed -i "/^\[renewalparams\]/a pre_hook = service $PROXY stop\npost_hook = service $PROXY start" "$RENEWAL_CONF"
     echo "Added stop/start hooks for $PROXY to $RENEWAL_CONF"
   fi
-  if ask "Renew the certificate automatically?"; then RENEWAL=enable; else RENEWAL=disable; fi
+  if confirm "Renew the certificate automatically?"; then RENEWAL=enable; else RENEWAL=disable; fi
   # certbot.timer (apt) or snap.certbot.renew.timer (snap)
   for TIMER in certbot.timer snap.certbot.renew.timer; do
     lxc exec proxy -- systemctl $RENEWAL --now $TIMER 2>/dev/null
@@ -126,7 +126,7 @@ if [[ -z $OLD_NET ]]; then
   echo "No NAT rule found in /etc/ufw/before.rules, nothing to do"
 elif [[ $OLD_NET == "$LXD_NET" ]]; then
   echo "Already correct ($LXD_NET)"
-elif ask "NAT rule uses $OLD_NET but lxdbr0 is $LXD_NET. Fix it?"; then
+elif confirm "NAT rule uses $OLD_NET but lxdbr0 is $LXD_NET. Fix it?"; then
   BACKUP=/etc/ufw/before.rules.bak-$(date +%Y%m%d%H%M%S)
   cp /etc/ufw/before.rules "$BACKUP"
   sed -i "/POSTROUTING/s|${OLD_NET}|${LXD_NET}|g" /etc/ufw/before.rules
@@ -142,13 +142,90 @@ for CONTAINER in $CONTAINERS; do
   [[ $(echo "$CONTAINER" | jq -r .type) == rsyslog_logger ]] || continue
   FOUND=true
   NAME=$(echo "$CONTAINER" | jq -r .name)
-  if ask "$NAME: redo the rsyslog setup (the old one used the wrong subnet and config)?"; then
+  if confirm "$NAME: redo the rsyslog setup (the old one used the wrong subnet and config)?"; then
     # old setup uncommented the legacy imudp/imtcp lines, which clash with the new config
     lxc exec "$NAME" -- sed -i -E '/^[^#].*(imudp|imtcp|UDPServerRun|InputTCPServerRun)/s/^/#/' /etc/rsyslog.conf
     source containers/rsyslog_logger_postsetup
   fi
 done
 [[ $FOUND == true ]] || echo "None configured"
+
+########################################################################
+echo
+echo "== 7. Munin login"
+# older setups served /munin to anyone
+if ! lxc info monitor >/dev/null 2>&1; then
+  echo "Munin is not installed"
+else
+  [[ $PROXY == nginx ]] && SITE=/etc/nginx/upstream/munin.conf PASSWD_FILE=/etc/nginx/munin.htpasswd \
+                        || SITE=/etc/apache2/upstream/munin PASSWD_FILE=/etc/apache2/munin.htpasswd
+  if lxc exec proxy -- grep -q "$PASSWD_FILE" "$SITE" && lxc exec proxy -- test -s "$PASSWD_FILE"; then
+    echo "Already has a login"
+  elif [[ ! -t 0 ]]; then
+    echo "WARNING: /munin is open to anyone. Run sudo dhis2-upgrade-setup in a terminal to set a login."
+  else
+    echo "/munin is open to anyone: set a login for it"
+    service/dhis2-munin-login
+  fi
+fi
+
+########################################################################
+echo
+echo "== 8. Glowroot logins"
+# older setups gave Glowroot's anonymous user admin rights on every instance
+OPEN=()
+for ROW in $(lxc list -c ns --format csv); do
+  C=${ROW%,*} STATE=${ROW#*,}
+  lxc config get "$C" user.type | grep -q Tomcat || continue
+  if [[ $STATE != RUNNING ]]; then
+    echo "$C: skipped (not running), start it and re-run to check it"
+  elif ! lxc exec "$C" -- test -f /opt/glowroot/admin.json; then
+    [[ -n $(lxc config get "$C" user.dhis2.glowroot) ]] || lxc config set "$C" user.dhis2.glowroot off
+  elif lxc exec "$C" -- grep -q '"anonymous"' /opt/glowroot/admin.json; then
+    OPEN+=("$C")
+  fi
+done
+if [[ ${#OPEN[@]} -eq 0 ]]; then
+  echo "No open Glowroot pages"
+elif [[ ! -t 0 ]]; then
+  echo "WARNING: Glowroot on ${OPEN[*]} is open to anyone. Run sudo dhis2-upgrade-setup in a terminal to set logins."
+else
+  echo "Glowroot on ${OPEN[*]} is open to anyone: it needs a login"
+  MODE=$(jq -r '.glowroot_login // empty' $CONF)
+  while [[ ! $MODE =~ ^(shared|own)$ ]]; do
+    ask MODE "Glowroot login: 'shared' (one login for all instances) or 'own' (one per instance)" shared
+  done
+  jq --arg m "$MODE" '.glowroot_login = $m' $CONF > $CONF.new && cat $CONF.new > $CONF && rm $CONF.new
+  if [[ $MODE == shared ]] && ! glowroot_load_shared; then
+    echo "Set the shared Glowroot login"
+    glowroot_new_login "" false
+    glowroot_save_shared
+  fi
+  for C in "${OPEN[@]}"; do
+    if [[ $MODE == own ]]; then
+      echo "Glowroot login for $C"
+      glowroot_new_login "" false
+    fi
+    glowroot_write_admin "$C" "$MODE"
+    RESTART+=("$C")
+    GLOWROOT_PENDING+=("$C")
+  done
+fi
+
+########################################################################
+if [[ ${#RESTART[@]} -gt 0 ]]; then
+  echo
+  echo "== Restarts"
+  for C in $(printf '%s\n' "${RESTART[@]}" | sort -u); do
+    if confirm "$C: restart tomcat now so the fixes take effect (DHIS2 will be down for a few minutes)?" n; then
+      lxc exec "$C" -- service tomcat9 restart
+    elif [[ " ${GLOWROOT_PENDING[*]} " == *" $C "* ]]; then
+      echo "WARNING: $C: Glowroot stays open to anyone until tomcat restarts"
+    else
+      echo "$C: fixes apply on the next tomcat restart"
+    fi
+  done
+fi
 
 echo
 echo "Done. Things this script cannot repair:"
