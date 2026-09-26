@@ -5,6 +5,18 @@ Phases are roughly in order: each phase builds on the ones before it.
 
 Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
+## Where we are (paused 2026-09-26)
+
+- Branch `develop`, nothing pushed. `master` is still the original code (`a37e7db`).
+- Phases 0 and 2 are written and committed. Nothing has been tested on a real server yet: all `[~]`.
+- **Next step:** discuss and agree the phase 3 requirements (multiple DHIS2 versions, Tomcat 9/10 per instance, task 3.0),
+  then make the plan in plan mode (see the Workflow section in `CLAUDE.md`).
+- Testing (phase 1) waits until the scripts are written, as the user asked.
+  Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
+- Until `develop` is merged, install on the test server with
+  `curl -fsSL https://raw.githubusercontent.com/redmondking/dhis2-tools-ng/develop/install.sh | sudo DHIS2_TOOLS_BRANCH=develop bash`
+  (this needs `develop` pushed first).
+
 ## Phase 0 – Bug fixes
 
 - [~] 0.1 `dhis2-create-instance`: `-n` ignored, `JAVA_HOME` rendered as `java-{{ 17 }}-...`, gawk-only free-IP pick, prefix-matching name checks
