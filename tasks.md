@@ -1,6 +1,6 @@
 # Tasks
 
-Design and decisions are in `CLAUDE.md`. This file tracks the work.
+Design and decisions are in `architecture.md`; how Claude works is in `CLAUDE.md`. This file tracks the work.
 Phases are roughly in order: each phase builds on the ones before it.
 
 Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
@@ -9,8 +9,9 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 - Branch `develop`, nothing pushed. `master` is still the original code (`a37e7db`).
 - Phases 0, 2 and 3 are written and committed. Nothing has been tested on a real server yet: all `[~]`.
-- Command and flag rules agreed and written into `CLAUDE.md`. Every command was audited; the results are phase 3b
+- Command and flag rules agreed (`architecture.md` section 12). Every command was audited; the results are phase 3b
   (existing commands) and the automation notes in phases 4–9 (new commands).
+- 2026-09-26: the design moved from `CLAUDE.md` into `architecture.md`, restoring sections accidentally deleted in commit `356d186`.
 - **Next step:** plan phase 3b in plan mode, then implement. Then phase 4 (hostnames and paths).
 - Testing (phase 1) waits until the scripts are written, as the user asked.
   Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
@@ -141,10 +142,10 @@ Requirements agreed with the user on 2026-09-26.
 
 ## Phase 3b – Existing commands follow the command and flag rules
 
-Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New commands follow the rules when they are built (flags listed in their phase below).
+Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-09-26. New commands follow the rules when they are built (flags listed in their phase below).
 
 - [ ] 3b.1 Shared helpers: `need_flags` (collect every missing flag, then one error with exit 3), a summary/confirm helper,
-      `--secrets-stdin` reader (JSON object on stdin, keys like `glowroot_password`; see `CLAUDE.md`), and "no terminal: add -y" (exit 3)
+      `--secrets-stdin` reader (JSON object on stdin, keys like `glowroot_password`; see `architecture.md` section 12), and "no terminal: add -y" (exit 3)
 - [ ] 3b.2 `dhis2-create-instance`:
   - first question: 1) create and deploy DHIS2 2) create only (`--no-deploy`)
   - "where does DHIS2 come from": 1) official release (`-V`) 2) own war file (`-f`) 3) own war at a URL (`-l`)
@@ -153,10 +154,10 @@ Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New command
     - label `user.dhis2.source` = `official` or `custom`
   - checksum failure menu: 1) try again 2) choose another release 3) stop
   - summary + "Create it?"
-  - `-y` (all required flags, see the table in `CLAUDE.md`'s rules; defaults: IP, postgres, Glowroot user `admin`, deploy)
+  - `-y` (all required flags, see `architecture.md` section 12; defaults: IP, postgres, Glowroot user `admin`, deploy)
   - `--dry-run`
   - `--ip`, `--postgres` as named flags; the positional forms keep working
-  - two possible secrets (Glowroot password, and the DHIS2 admin password from 5.3): see the secrets rule in `CLAUDE.md`
+  - two possible secrets (Glowroot password, and the DHIS2 admin password from 5.3): see the secrets rule in `architecture.md` section 12
 - [ ] 3b.3 `dhis2-deploy-war`:
   - the same "where does DHIS2 come from" menu
   - `--based-on`, `--sha256`, and "choose another release" on a checksum failure
@@ -214,7 +215,7 @@ Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New command
   - If either differs, wait until DHIS2 is up and change it through the API.
   - Skip this step when the instance was restored from a backup.
 - [ ] 5.4 Memory for the instance (Java heap + container limit), default based on free RAM (`--memory <size>`)
-- Automation: `--admin-user`; the admin password is a second secret next to the Glowroot password (see the secrets rule in `CLAUDE.md`)
+- Automation: `--dhis2-user`; the admin password is `dhis2_password` in `--secrets-stdin` (see `architecture.md` section 12)
 
 ## Phase 6 – Backups
 
@@ -280,7 +281,7 @@ Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New command
   - `list --json`; `test` sets the exit code; `sync --dry-run` (rsync `-n` / rclone `--dry-run`); `remove -y`
   - SSH key install needs the remote password (`ssh-copy-id`), so without a terminal: `--install-key no` prints the public key
     for the caller to add on the remote (agreed 2026-09-26)
-  - cloud credentials as secrets (see the secrets rule in `CLAUDE.md`)
+  - cloud credentials as secrets (see `architecture.md` section 12)
 - [ ] 6.12 Later: alert on failure (e.g. email to the address in `containers.json`). No `fetch` from remotes (user decision).
 
 Example:
@@ -353,12 +354,6 @@ Testing: connect ✓  write ✓  delete test file ✓
 - [ ] Alerts when a remote backup fails (6.12)
 - [ ] `setup.sh --answers` replay of a previous wizard run
 
-## Decisions from the open questions (2026-09-25)
+## Decisions
 
-- Host OS: Ubuntu 24.04 for new installs. `upgrade_setup.sh` also runs on existing 20.04/22.04 hosts.
-- Proxy: **nginx only** (see 2.10, 2.11).
-- The fork is the user's own project. Nothing is contributed back to `bobjolliffe/dhis2-tools-ng`. `upstream` stays as a remote, to pull fixes.
-- One shared PostgreSQL 16 container (2.5 checks 2.38 on it).
-- PostgreSQL 13 → 16 upgrade on existing servers: optional, with a checked backup (8.4).
-- Memory per instance: asked, with a default based on free RAM (5.4).
-- Munin and Glowroot: yes/no in the wizard, both defaulting to yes (5.1).
+All agreed decisions are in `architecture.md` (design sections and the decisions log, section 15).
