@@ -2,6 +2,30 @@
 
 Tools for setting up dhis2 on lxd.  A very short install guide.
 
+## Install and update
+
+On a fresh Ubuntu 24.04 server:
+
+```
+curl -fsSL https://raw.githubusercontent.com/redmondking/dhis2-tools-ng/master/install.sh | sudo bash
+```
+
+(Or download `install.sh`, read it, then run `sudo bash install.sh`.)  This installs the tools into
+`/opt/dhis2-tools` and the `dhis2-*` commands into `/usr/local/bin`.  Then describe the server and set it up:
+
+```
+sudo mkdir -p /usr/local/etc/dhis
+sudo cp /opt/dhis2-tools/configs/containers.json.sample /usr/local/etc/dhis/containers.json
+sudo nano /usr/local/etc/dhis/containers.json
+sudo dhis2-setup
+sudo dhis2-ssl-setup
+```
+
+Update the tools at any time with `sudo dhis2-tools-update` (`--check` only reports, `--rollback` goes back one version).
+Servers set up with the older scripts: run the install command above; it then runs `dhis2-upgrade-setup` to bring the server up to date.
+
+> The rest of this guide still describes the older layout (running scripts from the `setup` folder) and is being rewritten.
+
 Note that this guide is supplementary to the Implementation Guide.  Here we use that guide as a 
 configuration reference, and implement those configurations into a set of automated tools for
 installation and management.  It is not the intention here to repeat all the detailed explanation

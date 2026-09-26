@@ -8,15 +8,17 @@
 #   Bring a server installed with older dhis2-tools-ng scripts up to date.
 #   Safe to re-run: each step checks whether it is needed first.
 #
-#   Usage: sudo ./upgrade_setup.sh [-y]
+#   Usage: sudo dhis2-upgrade-setup [-y]
 #     -y  answer yes to every question (restarts are never done without asking)
+#   Without a terminal it behaves as with -y, and skips steps that need a password.
 
 [[ $EUID -eq 0 ]] || { echo "Please run with sudo"; exit 1; }
 [[ -f /usr/local/etc/dhis/containers.json ]] || { echo "No /usr/local/etc/dhis/containers.json: this server was not set up with dhis2-tools-ng"; exit 1; }
-cd "$(dirname "$0")" || exit 1
+cd "$(dirname "$(readlink -f "$0")")" || exit 1
+[[ -f VERSION ]] || { echo "Run the installed dhis2-upgrade-setup (install it with install.sh first)"; exit 1; }
 
 YES=false
-[[ $1 == "-y" ]] && YES=true
+[[ $1 == "-y" || ! -t 0 ]] && YES=true
 
 # ask "question" [default y|n]
 ask() {
@@ -35,17 +37,21 @@ source parse_config.sh
 
 ########################################################################
 echo
-echo "== 1. Service scripts in /usr/local/bin"
-CHANGED=""
-for F in service/*; do
-  cmp -s "$F" "/usr/local/bin/$(basename "$F")" || CHANGED="$CHANGED $(basename "$F")"
+echo "== 1. dhis2-* commands in /usr/local/bin"
+# older versions copied the service scripts into /usr/local/bin; now they are links into this directory
+OLD_COPIES=""
+for F in /usr/local/bin/dhis2-*; do
+  # only copies of scripts we ship; an admin's own dhis2-* scripts are left alone
+  [[ -f $F && ! -L $F && -f service/$(basename "$F") ]] && OLD_COPIES="$OLD_COPIES $(basename "$F")"
 done
-if [[ -z $CHANGED ]]; then
-  echo "Already up to date"
-elif echo "Changed:$CHANGED" && ask "Install the new versions (local edits to these files will be lost)?"; then
-  cp service/* /usr/local/bin
-  echo "Installed"
+if [[ -z $OLD_COPIES ]]; then
+  echo "Already links"
+elif echo "Old copies:$OLD_COPIES" && ask "Replace them with links to the installed versions (the old files are kept in /usr/local/etc/dhis/old-scripts)?"; then
+  mkdir -p /usr/local/etc/dhis/old-scripts
+  for F in $OLD_COPIES; do mv "/usr/local/bin/$F" /usr/local/etc/dhis/old-scripts/; done
+  echo "Moved"
 fi
+./install.sh --relink
 
 ########################################################################
 echo

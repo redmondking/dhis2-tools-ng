@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+#
+#   Get a letsencrypt certificate for the fqdn and switch the proxy to https.
+#   Usage: sudo dhis2-ssl-setup
+
+cd "$(dirname "$(readlink -f "$0")")" || exit 1
 
 # Parse json config file
 source parse_config.sh

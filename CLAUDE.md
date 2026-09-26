@@ -10,139 +10,30 @@ tomcat container per DHIS2 instance.
 
 ## Layout
 
-- `setup/lxd_setup.sh` – host bootstrap: installs LXD, then runs `install_scripts.sh` and `create_containers.sh`
+Repo:
+- `install.sh` – installs or updates the tools from GitHub (hardcoded `redmondking/dhis2-tools-ng`, branch `master`)
+- `setup/lxd_setup.sh` (`dhis2-setup`) – host bootstrap: LXD, sysctl, ufw, then `install_scripts.sh` and `create_containers.sh`
+- `setup/ssl_setup.sh` (`dhis2-ssl-setup`), `setup/upgrade_setup.sh` (`dhis2-upgrade-setup`)
 - `setup/parse_config.sh` – reads `/usr/local/etc/dhis/containers.json` into shell variables
 - `setup/containers/<type>` – script piped into a new container; `<type>_postsetup` is then sourced on the host
-- `setup/service/dhis2-*` – admin commands, copied to `/usr/local/bin`
-- `setup/etc/*` – templates copied to `/usr/local/etc/dhis` (never overwritten on re-install)
+- `setup/service/dhis2-*` – admin commands
+- `setup/etc/*` – templates copied once to `/usr/local/etc/dhis` (never overwritten)
 - `setup/configs/*` – LXD preseed, sysctl, proxy/postgres configs, `containers.json.sample`
+
+On a server:
+- `/opt/dhis2-tools/` = the repo's `setup/` + `install.sh` + `VERSION` (sha, date). Replaced by every update.
+  The previous version is kept in `/opt/dhis2-tools.old` (`dhis2-tools-update --rollback`).
+- `/usr/local/bin/dhis2-*` = symlinks into `/opt/dhis2-tools`: `dhis2-setup`, `dhis2-ssl-setup`, `dhis2-upgrade-setup`,
+  `dhis2-tools-update`, plus every `service/*` script under its own name. Internal scripts get no link.
+- `/usr/local/etc/dhis/` = this server's settings; updates never replace them.
+- Entry scripts `cd "$(dirname "$(readlink -f "$0")")"` so their relative paths work from anywhere.
+- **Any change to an `etc/*` template or to installed state must ship with a matching `upgrade_setup.sh` step**,
+  because `dhis2-tools-update` runs `dhis2-upgrade-setup` after installing.
+- `install.sh` testing overrides: `DHIS2_TOOLS_BRANCH` (e.g. develop), `DHIS2_TOOLS_DEST`, `DHIS2_TOOLS_BIN`.
+  Exit codes: 0 ok, 1 error, 2 update available (`--check`).
 
 Scripts must run on the Ubuntu host as root with `lxc`, `jq` and `ufw` available.
 Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellcheck`.
-
-## Goals
-
-1. **Multiple DHIS2 versions.** Get version metadata from the release feed
-   `https://releases.dhis2.org/v1/versions/stable.json`. Each entry gives
-   `name`, `supported`, `jdk`, `latestStableUrl`, `sha256`, `patchVersions`.
-   - Instance creation shows supported versions as a menu, installs the JDK the feed lists, downloads the war and checks its sha256.
-   - Record the version on the container with `lxc config set <name> user.dhis2.version`.
-   - `dhis2-deploy-war` handles patch updates within a version (2.41.9 → 2.41.10). Changing version is the upgrade script's job (goal 9).
-   - Add a small `dhis2-list-instances` showing name, version, Java, IP and status.
-   - JDK per version, from the feed on 2026-09-25: 2.41–2.43 → 17, 2.38–2.40 → 11, 2.37 → 8.
-2. **Interactive.** Use plain bash for now (`read -p`, `select`).
-   Move to `whiptail` only once the plain-bash version is fully tested.
-   - `setup.sh` wizard asks for FQDN, email, TZ, proxy and monitoring, then writes `containers.json`.
-   - A service script run without its args prompts for them with defaults (the only postgres container, the next free IP).
-   - Destructive commands (delete instance, restore db) always ask for confirmation.
-   - Existing flags and args keep working without prompts, so cron and scripted use still work.
-3. **Hostnames and paths** (final design agreed with user 2026-09-25, not built).
-   An instance's address is `https://<hostname>/<path>`. The container name is separate.
-   - Hostnames: the `fqdn` from `containers.json`, plus any number of **subdomains of the fqdn only**.
-   - Path: unique **within a hostname**, so `hmis.example.com/hmis` and `hmis2.example.com/hmis` can both exist.
-     Allowed characters: `[a-z0-9_-]`. `/munin` is reserved on the fqdn, and so is `/<other path>-glowroot`. No instance at the root `/`.
-   - Container name defaults to `<subdomain>-<path>` (`hmis2.example.com/hmis` → `hmis2-hmis`), and the user can override it.
-     It is also the database name and role, so scripts must quote it in SQL (`-` is not valid unquoted).
-   - Stored on the container: `user.dhis2.hostname`, `user.dhis2.path`.
-   - Tomcat context = path (war unzipped to `webapps/<path>`), so the proxy never rewrites paths. Glowroot is at `/<path>-glowroot`.
-   - `dhis2-create-instance` prompts:
-     1. Pick a hostname (the menu shows each hostname's paths) or enter a new subdomain.
-     2. Path.
-     3. Container name [generated].
-     Non-interactive: `-H <hostname> -p <path> [name]`.
-   - New subdomain: check that DNS resolves to this server. On failure, stop, explain what to check, and offer to retry.
-     Then create its nginx server block and its own certificate, asking about auto-renewal.
-   - The hostname root (`https://<hostname>/`) always shows a list of links to its instances.
-   - Deleting the last instance on a subdomain asks whether to remove the subdomain's proxy config and certificate. Never removes the fqdn.
-   - `dhis2-move-instance <name> <hostname> [path]` moves an instance to another hostname and/or path.
-   - `dhis2-list-instances` shows name, address, version, status.
-   - Existing instances: the upgrade script labels them hostname=fqdn, path=container name. No renames.
-4. **Oldest DHIS2 version: 2.38** (user decision). 2.38–2.40 need Java 11 + Tomcat 9 (22.04 container).
-   Offer only versions from the feed with `name >= 2.38`.
-   - Database: one shared PostgreSQL 16 container. The DHIS2 docs require ≥9.6 for 2.38/2.39 and recommend 14,
-     but say nothing about 16. **Test 2.38 on PG16.** If it fails, allow a second postgres container on 14 for old versions.
-5. **Admin login.** `dhis2-create-instance` asks for the admin username [`admin`] and password [`district`].
-   - Pressing Enter keeps DHIS2's defaults.
-   - The change-credentials step runs only if either value differs from the default: wait for DHIS2 to be up, then change it via the API.
-   - Keeping the defaults prints a warning, since `admin`/`district` is publicly known.
-   - Skipped when the instance was created from a backup, which brings its own users.
-6. **Backups.**
-   - The install/setup wizard asks for the backup settings, each with a default:
-     - time of the nightly run (`/etc/cron.d/dhis`)
-     - daily backups to keep (7)
-     - weekly backups to keep (3, taken on Sunday)
-     - monthly backups to keep (12, taken on the 1st; monthly deletion is new, it was never implemented)
-     - backup dir (`/var/pgbackups`)
-     - optional remote rsync target
-     These are written to `/usr/local/etc/dhis/dhis2-env` and the cron job is enabled.
-   - `dhis2-create-instance` asks "Back up this instance? [Y/n]" and adds its database to `PLAIN_BACKUPS`.
-     `dhis2-delete-instance` removes it.
-   - Layout: grouped by instance, then by date: `BACKUP_DIR/<instance>/<date>-<daily|weekly|monthly>/` holding
-     `<instance>.sql.gz[.enc]` and `<instance>.files.tar.gz[.enc]`.
-   - `dhis2-backup` also archives each instance's `/opt/dhis2/files` (the DHIS2 file store, which is not in the database dump),
-     encrypted when its database is.
-   - Remote copies: `dhis2-backup-remote add|list|test|sync|remove`, any number of remotes (`/usr/local/etc/dhis/remotes/<name>`).
-     - Types: SSH server (`rsync`, one key per remote) or cloud (`rclone`).
-     - Mode per remote: `keep` (default, never delete) or `mirror`.
-     - Adding a cloud remote warns about unencrypted instances and offers to encrypt them.
-     - No fetch from remotes, and failure alerts come later.
-   - `dhis2-backup` hardcodes the `postgres` container. Use each database's own container once there can be more than one.
-7. **Upgrade path for existing servers.** `setup/upgrade_setup.sh` repairs hosts installed with the
-   old scripts. Every fix that changes installed state needs a matching step there.
-8. **Create an instance from a backup.** `dhis2-create-instance` asks whether there is a backup to restore, and which DHIS2 version it is from.
-   - It restores the backup before DHIS2 first starts, then deploys that version's war.
-   - Versions older than 2.38 are refused.
-   - Accepts encrypted backups (asks for the password file), and restores the matching file-store archive if one is present.
-9. **DHIS2 version upgrade script** (`dhis2-upgrade-instance`). To be built **last**, because it has many variables (see tasks.md phase 9).
-   In particular, 2.41 → 2.42 moves from a Tomcat 9 / 22.04 container to a Tomcat 10 / 24.04 one.
-
-## Monitoring (agreed 2026-09-25)
-
-Security problem being fixed: today Glowroot gives `anonymous` the Administrator role and every `https://<fqdn>/<instance>-glowroot`
-is public, which exposes SQL, thread dumps and heap dumps. `/munin` is public too.
-Do this early (phase 2), plus `upgrade_setup.sh` steps for running servers.
-
-- **Munin**: optional, asked once in the setup wizard.
-  - No: no `monitor` container and no munin-node anywhere.
-  - Yes: `monitor` container; the host, proxy and postgres are monitored.
-  - Login: nginx basic auth on `/munin`, one server-wide login. The password hash (`openssl passwd -6`) lives on the proxy.
-    Change it with `dhis2-munin-login`.
-- **Glowroot**: a Java agent inside each instance's Tomcat (port 4000, published as `/<path>-glowroot`), not a container.
-  - Uses Glowroot's **own** login: `admin.json` users with `passwordHash` = PBKDF2-HMAC-SHA1, 16-byte key, 16-byte salt,
-    500000 iterations, formatted `b64(hash):b64(salt):500000` (unpadded base64). The iteration count must be exactly 500000.
-    Generate it with host python3, passing the password on stdin. Remove the `anonymous` user.
-  - The wizard asks whether Glowroot is on by default for new instances, and the login mode:
-    **shared** (one login for all instances; hash kept in `/usr/local/etc/dhis/glowroot-login`, root only) or **own** (asked per instance).
-  - `dhis2-create-instance` asks "Install Glowroot on this instance?" and, in own mode, for the login.
-    It also asks "Monitor this instance with Munin?" when Munin is installed (this absorbs `dhis2-tomcat-munin`).
-  - `dhis2-glowroot-login [instance]`: no argument changes the shared login everywhere; with an instance, it sets that instance's own login.
-    Glowroot reads logins only at startup, so the command asks before restarting.
-  - Stored on the container as `user.dhis2.glowroot` = `shared|own|off`.
-- Munin and Glowroot logins are always separate.
-- Passwords: the user always types them (twice). No defaults, nothing generated, empty passwords refused.
-- Later: turning Glowroot or Munin on or off for an existing instance.
-
-## Packages (agreed)
-
-- Use Ubuntu 24.04's own packages: `postgresql-16` + `postgresql-16-postgis-3`, `nginx` (1.24), `certbot` (apt, not snap). No third-party apt repositories.
-- nginx 1.24 does not support `http2 on;`, so keep `listen 443 ssl http2;`.
-- Existing servers keep their containers (20.04, PostgreSQL 13) until phase 8, which moves them to 24.04 and PostgreSQL 16 in one step.
-
-## Servlet container per DHIS2 version
-
-The official Ubuntu guide (docs.dhis2.org manual-install-on-ubuntu) and a check of the war files on 2026-09-25 agree:
-
-| DHIS2 | Java | Servlet API | Tomcat | Ubuntu package |
-|---|---|---|---|---|
-| 2.42, 2.43 | 17 | jakarta (Spring 6) | 10.1+ | `tomcat10` on 24.04 |
-| 2.41 and older | 17 / 11 / 8 | javax (Spring 5) | 9 | `tomcat9` exists only up to 22.04 |
-
-Decision (user, 2026-09-25): proxy, postgres and monitor containers, and instances of DHIS2 2.42+, use Ubuntu **24.04** with `tomcat10`.
-Instances of DHIS2 ≤2.41 use a **22.04** container with `tomcat9`, as the official DHIS2 guide does (22.04 standard support ends April 2027).
-
-## Tasks
-
-Tracked in `tasks.md`, which also lists the open questions. Update it as work is done: `[~]` means done but not tested on a real server.
 
 ## Workflow
 
