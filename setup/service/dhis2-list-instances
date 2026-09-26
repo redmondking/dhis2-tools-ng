@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#       ____  __  ______________
+#      / __ \/ / / /  _/ ___/__ \
+#     / / / / /_/ // / \__ \__/ /
+#    / /_/ / __  // / ___/ / __/
+#   /_____/_/ /_/___//____/____/
+#
+#   List the DHIS2 instances on this server
+
+PROG=$(basename "$0")
+source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
+
+usage() {
+  echo "Usage: $PROG [--json]"
+  echo "  --json      Output a JSON array (missing values are null)"
+  echo "  -h, --help  Display this help message"
+  exit "${1:-1}"
+}
+
+JSON=false
+case ${1-} in
+  --json) JSON=true ;;
+  -h|--help) usage 0 ;;
+  "") ;;
+  *) usage ;;
+esac
+
+INSTANCES=$(lxc list --format json | jq --arg base "$(server_base_url)" '
+  [.[] | select(.config["user.type"] == "Tomcat server") | {
+    name,
+    version: .config["user.dhis2.version"],
+    url: ($base + "/" + .name),
+    tomcat: .config["user.dhis2.tomcat"],
+    java: .config["user.dhis2.java"],
+    ip: .expanded_devices.eth0["ipv4.address"],
+    status: (.status | ascii_upcase),
+    glowroot: .config["user.dhis2.glowroot"],
+    munin: .config["user.dhis2.munin"]
+  }]') || die "could not read the instance list from lxc"
+
+if [[ $JSON == true ]]; then
+  echo "$INSTANCES"
+  exit 0
+fi
+
+jq -r '(["NAME", "VERSION", "URL", "TOMCAT", "JAVA", "IP", "STATUS", "GLOWROOT", "MUNIN"]),
+       (.[] | [.name, .version, .url, .tomcat, .java, .ip, .status, .glowroot, .munin] | map(. // "-"))
+       | @tsv' <<< "$INSTANCES" \
+  | awk -F'\t' '{ for (i = 1; i <= NF; i++) { cell[NR, i] = $i; if (length($i) > width[i]) width[i] = length($i) } cols = NF }
+       END { for (r = 1; r <= NR; r++) { line = ""
+               for (i = 1; i <= cols; i++) line = line sprintf("%-" width[i] "s  ", cell[r, i])
+               sub(/ +$/, "", line); print line } }'
