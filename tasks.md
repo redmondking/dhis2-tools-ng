@@ -9,7 +9,6 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 - Branch `develop`, nothing pushed. `master` is still the original code (`a37e7db`).
 - Phases 0, 2 and 3 are written and committed. Nothing has been tested on a real server yet: all `[~]`.
-- Phase 3 is written and committed too (all `[~]`).
 - **Next step:** discuss and agree the phase 4 requirements (hostnames and paths; the design is already in `CLAUDE.md`),
   then plan in plan mode.
 - Testing (phase 1) waits until the scripts are written, as the user asked.
