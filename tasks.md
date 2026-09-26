@@ -76,6 +76,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
     - `dhis2-create-instance -y` from a script with `--secrets-stdin`, and `--dry-run` (nothing created)
     - `dhis2-deploy-war` interactively: source menu, summary, going back with `--force` (typed instance name), a create-only
       instance getting its first release; `-y` and `--dry-run` from a script
+    - `dhis2-logview`: `-f`, `-r`, `-g` with quotes and `;` in the text (must only search), `-S`/`-U`, `-n`, `--json` on Tomcat 9 and 10
 - [ ] 1.4 Merge `develop` into `master` and push
 
 ## Phase 2 – Install/update, lock down monitoring, modernise the base
@@ -175,7 +176,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
       (shown in the summary); `--dry-run`, `--postgres` (no longer hardcoded; from phase 6 the default comes from the instance's
       `user.dhis2.postgres` label), "add -y" without a terminal
 - [ ] 3b.6 `dhis2-dbactivity --json`, `--postgres`
-- [ ] 3b.7 `dhis2-logview`: **security fix**. The `-g` text currently goes through a shell as root in the container.
+- [~] 3b.7 `dhis2-logview`: **security fix**. The `-g` text currently goes through a shell as root in the container.
       Run `journalctl` with an argument list instead. Fix `-f`/`-r` (they swallow the next argument). Add `--json` (journalctl `-o json`)
 - [ ] 3b.8 `dhis2-backup`: exit non-zero when any backup fails (today it always exits 0), `--dry-run`
 - [ ] 3b.9 `dhis2-ssl-setup`:
