@@ -32,7 +32,6 @@ if dpkg -s lxd >/dev/null 2>&1; then
 fi
 
 # install lxd with snap
-# snap install lxd --channel=4.0/stable
 snap install lxd 
 
 # initializing lxd system

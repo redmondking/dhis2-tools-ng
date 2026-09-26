@@ -3,7 +3,7 @@
 LXDBR=lxdbr0
 
 # ubuntu version for containers
-GUESTOS="20.04"
+GUESTOS="24.04"
 
 # some introspection
 DEFAULT_INTERFACE=$(ip route |grep default | awk '{print $5}')
@@ -63,8 +63,8 @@ for CONTAINER in $CONTAINERS; do
   fi
   lxc start $NAME
   # wait for network to come up
-  while true ; do
-    lxc exec $NAME -- nslookup archive.ubuntu.com >/dev/null && break || echo waiting for network; sleep 1 ;
+  until lxc exec $NAME -- getent hosts archive.ubuntu.com >/dev/null; do
+    echo waiting for network; sleep 1
   done
 
   # run setup scripts
@@ -99,8 +99,9 @@ if [[ $MONITORING == munin ]]; then
     fi
   done
   # Also monitor the host
+  lxc exec monitor -- sed -i -e "\$a[host.lxd]\n  address $(lxc network get lxdbr0 ipv4.address | cut -d/ -f1)\n  use_node_name yes\n" /etc/munin/munin.conf
   sudo apt-get install munin-node -y
-  sudo echo "cidr_allow $MUNIN_IP/32" >> /etc/munin/munin-node.conf
+  grep -q "^cidr_allow $MUNIN_IP/32" /etc/munin/munin-node.conf || echo "cidr_allow $MUNIN_IP/32" >> /etc/munin/munin-node.conf
   sudo ufw allow proto tcp from $MUNIN_IP to any port 4949
   sudo service munin-node restart
 

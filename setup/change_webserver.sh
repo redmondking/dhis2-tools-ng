@@ -3,7 +3,7 @@
 LXDBR=lxdbr0
 
 # ubuntu version for containers
-GUESTOS="20.04"
+GUESTOS="24.04"
 
 # some introspection
 DEFAULT_INTERFACE=$(ip route |grep default | awk '{print $5}')
@@ -64,8 +64,8 @@ sudo ufw reload
 fi
 lxc start $NAME
 # wait for network to come up
-while true ; do
-lxc exec $NAME -- nslookup archive.ubuntu.com >/dev/null && break || echo waiting for network; sleep 1 ;
+until lxc exec $NAME -- getent hosts archive.ubuntu.com >/dev/null; do
+  echo waiting for network; sleep 1
 done
 
 # run setup scripts

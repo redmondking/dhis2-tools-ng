@@ -11,7 +11,7 @@ mkdir /opt/dhis2
 chown -R tomcat.tomcat /opt/dhis2
 
 echo "tomcat" >> /etc/cron.deny
-echo "tomcat" >> /at.deny
+echo "tomcat" >> /etc/at.deny
 
 mkdir /opt/glowroot
 chown -R tomcat.tomcat /opt/glowroot
@@ -222,6 +222,6 @@ EOF
 
 
 ufw allow proto tcp from PROXY_IP to any port 8080  
-ufw enable
+ufw --force enable
 
 

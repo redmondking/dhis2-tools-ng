@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DEBIAN_FRONTEND=noninteractive
+export DEBIAN_FRONTEND=noninteractive
 
 # This will make whatever server it is run on a complete listening munin host
 MUNINCONF='/etc/munin/munin.conf'
@@ -41,15 +41,9 @@ fi
    #Also add hosts as required to the config file
    perl -pi -e "s|localhost.localdomain|monitor.lxd|sig" $MUNINCONF
 
-   cat >> $MUNINCONF <<EOF
-[host.lxd]
-    address 192.168.0.1
-    use_node_name yes
-
-EOF
 
   service apache2 restart
 
   ufw allow 80/tcp
   ufw allow 443/tcp
-  ufw enable
+  ufw --force enable

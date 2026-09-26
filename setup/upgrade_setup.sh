@@ -213,6 +213,18 @@ else
 fi
 
 ########################################################################
+echo
+echo "== 9. Template fixes in /usr/local/etc/dhis"
+# templates are copied once and may hold local edits, so only the known lines are patched
+TS=/usr/local/etc/dhis/tomcat_setup
+if [[ -f $TS ]] && grep -q -e '^echo "tomcat" >> /at.deny' -e '^ufw enable' $TS; then
+  sed -i -e 's|^echo "tomcat" >> /at.deny|echo "tomcat" >> /etc/at.deny|' -e 's|^ufw enable|ufw --force enable|' $TS
+  echo "Fixed tomcat_setup (at.deny path, non-interactive ufw)"
+else
+  echo "Nothing to fix"
+fi
+
+########################################################################
 if [[ ${#RESTART[@]} -gt 0 ]]; then
   echo
   echo "== Restarts"

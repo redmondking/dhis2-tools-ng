@@ -58,13 +58,6 @@ ssl_session_cache shared:SSL:20m;
 ssl_session_timeout 20m;
 ssl_session_tickets off;
 
-# SSL OCSP stapling
-ssl_stapling         on;
-ssl_stapling_verify  on;
-
-# DNS resolver configuration for OCSP response
-resolver          8.8.4.4 8.8.8.8 valid=300s ipv6=off;
-resolver_timeout  10s;
 EOF
 
 ####
@@ -85,9 +78,6 @@ server_tokens off;
 
 # Protect against MIME sniffing vulnerabilities
 add_header X-Content-Type-Options "nosniff" always;
-
-# X-XSS Protection
-add_header X-XSS-Protection "1; mode=block" always;
 EOF
 
 lxc file push /tmp/performance.conf $NAME/etc/nginx/conf.d/performance.conf
@@ -98,10 +88,6 @@ lxc file push /tmp/ssl.conf $NAME/etc/nginx/conf.d/ssl.conf
 rm /tmp/ssl.conf
 lxc file push /tmp/security.conf $NAME/etc/nginx/conf.d/security.conf
 rm /tmp/security.conf
-
-# Remove nginx references
-lxc exec $NAME -- sed -i "s/nginx/webserver/g" /usr/share/nginx/html/index.html
-lxc exec $NAME -- sed -i "s/nginx/webserver/g" /usr/share/nginx/html/50x.html
 
 echo "Updating firewall"
 lxc exec $NAME -- ufw allow 80/tcp

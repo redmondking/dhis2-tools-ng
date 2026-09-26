@@ -22,7 +22,8 @@ MONITORING=$(jq -r .monitoring $CONF)
 GLOWROOT_LOGIN=$(jq -r '.glowroot_login // "own"' $CONF)
 JAVA_VERSION="11"
 
-GUESTOS=20.04
+# instances run tomcat9, which Ubuntu ships up to 22.04 (phase 3 adds 24.04 + tomcat10 for DHIS2 2.42+)
+GUESTOS=22.04
 
 ###############################################################
 usage() {
@@ -197,8 +198,8 @@ lxc config set $NAME user.type "Tomcat server"
 lxc start $NAME 
 
 # wait for network to come up
-while true ; do
-  lxc exec $NAME -- nslookup archive.ubuntu.com >/dev/null && break || echo waiting for network; sleep 1 ;
+until lxc exec $NAME -- getent hosts archive.ubuntu.com >/dev/null; do
+  echo waiting for network; sleep 1
 done
 
 # Added PROXY_IP to tomcat_setup
