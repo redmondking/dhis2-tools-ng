@@ -10,7 +10,7 @@
 #   First install:
 #     curl -fsSL https://raw.githubusercontent.com/redmondking/dhis2-tools-ng/master/install.sh | sudo bash
 #   Update (installed as dhis2-tools-update):
-#     sudo dhis2-tools-update [--check] [-y] [--rollback]
+#     sudo dhis2-tools-update [--check [--json]] [-y] [--rollback]
 #
 #   Exit codes: 0 done or already up to date, 1 error, 2 update available (--check only)
 
@@ -22,9 +22,10 @@ DEST=${DHIS2_TOOLS_DEST:-/opt/dhis2-tools}    # override only for testing
 BIN=${DHIS2_TOOLS_BIN:-/usr/local/bin}        # override only for testing
 
 usage() {
-  echo "Usage: $(basename "$0") [--check] [-y] [--rollback]"
+  echo "Usage: $(basename "$0") [--check [--json]] [-y] [--rollback]"
   echo "  (no option)  install, or update to the latest version of $REPO ($BRANCH)"
   echo "  --check      only report whether an update is available (exit 2 if it is)"
+  echo "  --json       with --check: print {\"branch\", \"current\", \"latest\", \"update_available\"} (exit codes unchanged)"
   echo "  -y           do not ask for confirmation"
   echo "  --rollback   go back to the previously installed version"
 }
@@ -54,10 +55,11 @@ link_commands() {
 }
 
 main() {
-  local CHECK=false YES=false ROLLBACK=false
+  local CHECK=false YES=false ROLLBACK=false JSON=false
   while [[ $# -gt 0 ]]; do
     case $1 in
       --check) CHECK=true ;;
+      --json) JSON=true ;;
       -y|--yes) YES=true ;;
       --rollback) ROLLBACK=true ;;
       --relink) link_commands; exit 0 ;;   # used by dhis2-upgrade-setup
@@ -67,6 +69,7 @@ main() {
     shift
   done
 
+  [[ $JSON == false || $CHECK == true ]] || die "--json is only for --check"
   [[ $EUID -eq 0 || -n ${DHIS2_TOOLS_DEST:-} ]] || die "please run with sudo"
 
   # When piped from curl, stdin is this script: take answers from the terminal if there is one
@@ -87,6 +90,15 @@ main() {
     "https://api.github.com/repos/$REPO/commits/$BRANCH") || die "could not reach GitHub"
   [[ $LATEST =~ ^[0-9a-f]{40}$ ]] || die "unexpected answer from GitHub: $LATEST"
   [[ -f $DEST/VERSION ]] && CURRENT=$(cut -d' ' -f1 "$DEST/VERSION")
+
+  if [[ $JSON == true ]]; then
+    local AVAILABLE=true
+    [[ $CURRENT == "$LATEST" ]] && AVAILABLE=false
+    printf '{"branch": "%s", "current": %s, "latest": "%s", "update_available": %s}\n' \
+      "$BRANCH" "$( [[ -n $CURRENT ]] && echo "\"$CURRENT\"" || echo null )" "$LATEST" "$AVAILABLE"
+    [[ $AVAILABLE == true ]] && exit 2
+    exit 0
+  fi
 
   if [[ $CURRENT == "$LATEST" ]]; then
     echo "dhis2-tools is up to date (${LATEST:0:7}, $BRANCH)"

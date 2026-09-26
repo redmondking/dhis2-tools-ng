@@ -189,7 +189,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] 3b.10 `dhis2-upgrade-setup --dry-run` (report what each step would change)
 - [ ] 3b.14 `dhis2-upgrade-setup` takes the Munin and Glowroot passwords as flags (agreed 2026-09-26), so automation can close
       open Munin/Glowroot pages without a terminal. Also the Glowroot login mode (`--glowroot-login shared|own`) and usernames
-- [ ] 3b.11 `dhis2-tools-update --check --json` → `{"current", "latest", "update_available"}`
+- [~] 3b.11 `dhis2-tools-update --check --json` → `{"current", "latest", "update_available"}`
 - [ ] 3b.12 `dhis2-glowroot-login` / `dhis2-munin-login`: `--dry-run` (which instances would change and restart)
 - [ ] 3b.13 `dhis2-tomcat-munin`: stop at the first failure and exit non-zero
 - [ ] 3b.17 (found in 3b.9) `dhis2-ssl-setup`: stop when certbot fails. Today it carries on and switches nginx to a certificate
