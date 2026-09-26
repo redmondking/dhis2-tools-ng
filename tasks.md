@@ -9,10 +9,8 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 - Branch `develop`, nothing pushed. `master` is still the original code (`a37e7db`).
 - Phases 0 and 2 are written and committed. Nothing has been tested on a real server yet: all `[~]`.
-- **First, a fix:** 8.3 must be done before testing. Phase 2 deleted the `postgres12` type, and `parse_config.sh` stops on unknown types.
-  So on existing servers whose `containers.json` says `postgres12`, `dhis2-upgrade-setup` and `dhis2-ssl-setup` would stop.
-- **Next step:** discuss and agree the phase 3 requirements (multiple DHIS2 versions, Tomcat 9/10 per instance, task 3.0),
-  then make the plan in plan mode (see the Workflow section in `CLAUDE.md`).
+- **Next step:** phase 3 requirements are agreed (see Phase 3). Make the plan in plan mode, then implement.
+  3.9 (the `postgres12` → `postgres` fix) goes first.
 - Testing (phase 1) waits until the scripts are written, as the user asked.
   Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
 - Until `develop` is merged, install on the test server with
@@ -91,25 +89,45 @@ Moved: 2.4 (Tomcat per instance) → 3.0; 2.11 (switch apache servers to nginx) 
 
 ## Phase 3 – Multiple DHIS2 versions
 
-- [ ] 3.0 Tomcat per instance: `tomcat9` on 22.04 or `tomcat10` on 24.04, stored as `user.dhis2.tomcat`. Remove the hardcoded `tomcat9` from:
-  - `etc/tomcat_setup`
-  - `etc/tomcat_default`
-  - `dhis2-create-instance`
-  - `dhis2-deploy-war`
-  - `dhis2-logview`
-  - `dhis2-tomcat-munin`
-  - `dhis2-glowroot-login`
-  - `upgrade_setup.sh`
-- [ ] 3.1 Shared helpers for the service scripts (partly done in 2.13: `ask`, `ask_yes_no`, `ask_password`, `die`; still to do: feed and labels):
-  - read the release feed
-  - prompts with defaults (`ask`, `menu`, `confirm`)
-  - read and write the `user.dhis2.*` labels
-- [ ] 3.2 Version menu from the feed: versions ≥ 2.38, then the patch release (default: latest)
-- [ ] 3.3 Choose Ubuntu, Tomcat and JDK from the version
-- [ ] 3.4 Download the war, check its sha256, deploy it to `webapps/<path>`
-- [ ] 3.5 Record `user.dhis2.version` and `user.dhis2.tomcat` on the container
-- [ ] 3.6 `dhis2-deploy-war`: patch updates within the same version, with a sha256 check. For a different version, point to the upgrade script (phase 9)
-- [ ] 3.7 `dhis2-list-instances`: name, address, version, status
+Requirements agreed with the user on 2026-09-26.
+
+- [ ] 3.0 Tomcat per instance: `tomcat9` on 22.04 or `tomcat10` on 24.04, stored as `user.dhis2.tomcat`.
+  - Every script that assumed `tomcat9` reads it instead: the service name, `/var/lib/tomcat*`, `/etc/tomcat*`, `/etc/default/tomcat*`.
+    That covers `etc/tomcat_setup`, `etc/tomcat_default`, `dhis2-create-instance`, `dhis2-deploy-war`, `dhis2-logview`,
+    `dhis2-tomcat-munin`, `dhis2-glowroot-login` and `upgrade_setup.sh`.
+  - On existing servers, `dhis2-upgrade-setup` updates the copied `tomcat_setup` template, touching only those names.
+- [ ] 3.1 Shared helpers (the prompts are done; still to do): read the release feed, and read/write the `user.dhis2.*` labels.
+- [ ] 3.2 Version list, the same in `dhis2-create-instance` and `dhis2-deploy-war`:
+  - It shows **every** release from the feed for 2.38 and newer, including hotfixes (e.g. `2.42.5.2`), one line per version,
+    marked supported or end of support.
+  - The user types the **exact** release name. `2.42` is refused; `2.42.0` is accepted. The default is the newest release.
+  - Non-interactive: `-V <exact release>`.
+- [ ] 3.3 The version decides the container, Tomcat and Java, with no questions:
+  - 2.42+ → Ubuntu 24.04, tomcat10
+  - 2.38–2.41 → Ubuntu 22.04, tomcat9
+  - Java from the feed's `jdk` (2.41+ → 17, 2.38–2.40 → 11)
+  - `-j` is removed.
+- [ ] 3.4 `dhis2-create-instance` deploys the chosen release straight away (no `--no-deploy`; a backup can be restored afterwards:
+      stop, restore, start). The war is downloaded and checked against the feed's sha256 **before** the container and database are created.
+  - On a mismatch it retries automatically (3 attempts), then asks: 1) try again 2) stop (nothing created).
+  - Without a terminal it stops with exit 1. There is never a "deploy anyway". Custom builds go through `dhis2-deploy-war -f`.
+- [ ] 3.5 Record `user.dhis2.version` (e.g. `2.42.6`), `user.dhis2.tomcat` and `user.dhis2.java` on the container.
+- [ ] 3.6 `dhis2-deploy-war`:
+  - Lists only the instance's own version line, with the current release marked. `-V <exact release>` installs it, with the sha256 check.
+  - A different major version (2.41 → 2.42) is always refused and points to the upgrade script (phase 9).
+  - Going back within a line (2.42.5 → 2.42.3) is refused unless `--force`. Then a warning (patch releases can change the database;
+    restoring a backup from that release is the safe way) must be acknowledged by typing the instance name.
+    Without a terminal, `--force -y` is required.
+  - `-l <url>` and `-f <file>` stay, for custom builds (no checksum), and update the version label from the war's `dhis-api-*.jar`.
+- [ ] 3.7 `dhis2-list-instances` shows name, version, URL, Tomcat, Java, IP, status, Glowroot and Munin, with a `--json` output.
+  - URL = `https://<fqdn>/<name>` until phase 4, or `http://` if there is no certificate yet.
+- [ ] 3.8 (was 8.1) `dhis2-upgrade-setup` labels existing instances:
+  - version from `WEB-INF/lib/dhis-api-<version>.jar` (present in 2.38–2.42 wars), or `none` if nothing is deployed
+  - tomcat `tomcat9`
+  - java from the instance's `java`
+  - glowroot/munin from what is installed
+- [ ] 3.9 (was 8.3, do first) `dhis2-upgrade-setup` changes type `postgres12` → `postgres` in `containers.json` before anything reads it
+- Test on the server: Glowroot 0.14.7 with Tomcat 10 and DHIS2 2.42+ (Jakarta). If it doesn't work, turn Glowroot off automatically for 2.42+.
 
 ## Phase 4 – Hostnames and paths
 
@@ -231,14 +249,9 @@ Testing: connect ✓  write ✓  delete test file ✓
 
 ## Phase 8 – Bring existing servers forward (`upgrade_setup.sh`)
 
-- [ ] 8.1 Label existing instances:
-  - `hostname` = fqdn
-  - `path` = container name
-  - `version` = read from the deployed war
-  - `tomcat` = `tomcat9`
+- [ ] 8.1 Label existing instances with `hostname` = fqdn and `path` = container name (version/tomcat/java moved to 3.8)
 - [ ] 8.2 Move proxy config to the per-hostname layout
-- [ ] 8.3 `containers.json` type `postgres12` → `postgres`. **Needed before testing**: it must run in `upgrade_setup.sh` before `parse_config.sh`
-      is sourced, because phase 2 deleted the `postgres12` type and `parse_config.sh` stops on unknown types
+- [ ] 8.3 (moved to 3.9)
 - [ ] 8.4 Optional PostgreSQL 13 → 16 upgrade, with a checked backup first
 - [ ] 8.5 Keep existing `dhis2-env` backup settings, only adding new keys
 - [ ] 8.6 Move existing backups into the new layout: `backup<date>-<type>/<db>.sql.gz*` → `<db>/<date>-<type>/`.
