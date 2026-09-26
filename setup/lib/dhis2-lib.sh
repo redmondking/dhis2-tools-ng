@@ -65,19 +65,26 @@ ask_yes_no() {
 # summary LABEL TEXT: add a line to the summary shown by confirm_summary
 summary() { SUMMARY+=("$(printf '%-12s %s' "$1" "$2")"); }
 
-# confirm_summary QUESTION: show the summary, then go ahead only when confirmed.
-# --dry-run: stop here (exit 0). -y: go ahead. No terminal: exit 3. "n": nothing changed (exit 1).
+# confirm_summary QUESTION [DEFAULT y|n]: show the summary, then go ahead only when confirmed.
+# --dry-run: stop here (exit 0). -y: go ahead. No terminal: exit 3. No: nothing changed (exit 1).
+# Destructive actions pass n, so Enter means no.
 confirm_summary() {
-  local __answer
+  local __answer __default=${2:-y}
   echo
   printf '  %s\n' "${SUMMARY[@]}"
   echo
   if [[ $DRY_RUN == true ]]; then echo "Dry run: nothing changed."; exit 0; fi
   [[ $YES == true ]] && return 0
   [[ -t 0 ]] || die_missing "no terminal to confirm: add -y to go ahead without asking"
-  read -r -p "$1 [Y/n] " __answer
-  if [[ $__answer =~ ^[Nn] ]]; then echo "Nothing changed." >&2; exit 1; fi
-  return 0
+  if [[ $__default == y ]]; then
+    read -r -p "$1 [Y/n] " __answer
+    [[ ! $__answer =~ ^[Nn] ]] && return 0
+  else
+    read -r -p "$1 [y/N] " __answer
+    [[ $__answer =~ ^[Yy] ]] && return 0
+  fi
+  echo "Nothing changed." >&2
+  exit 1
 }
 
 # secrets_load ALLOWED_KEY...: read the --secrets-stdin JSON object; unknown keys are refused (so a typo can't pass unnoticed)

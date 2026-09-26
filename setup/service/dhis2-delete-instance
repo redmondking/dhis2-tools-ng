@@ -5,76 +5,108 @@
 #    / /_/ / __  // / ___/ / __/
 #   /_____/_/ /_/___//____/____/
 #
-#   Script to completely remove a dhis2 instance
+#   Remove a DHIS2 instance: its container, database, proxy entries and database access. Its backups are kept.
 
-PROG=`basename $0`
+PROG=$(basename "$0")
+# shellcheck source=../lib/dhis2-lib.sh
+source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
 
-PROXY=$(cat /usr/local/etc/dhis/containers.json| jq -r .proxy)
-
-###############################################################
 usage() {
-  echo "Usage: $PROG [-y] <name> [<postgres_container>]"
-  echo "  name: name of the dhis2 container"
-  echo "  postgres_container: name of the postgres container"
-  echo "Options:"
-  echo "  -y               Do not ask for confirmation"
-  echo "  -h, --help       Display this help message"
+  cat <<EOF
+Usage: $PROG [options] <instance> [<postgres_container>]
+Options:
+      --postgres <container>  postgres container holding its database (default: postgres)
+  -y, --yes                   do not ask for confirmation
+      --dry-run               show what would be removed, change nothing
+  -h, --help                  this help
+Exit codes: 0 ok, 1 failure or refused, 3 missing input (e.g. no terminal to confirm: add -y).
+EOF
+  exit "${1:-1}"
 }
 
-CONFIRM=true
-while getopts hy opt
-do
-  case $opt in
-    y) CONFIRM=false;;
-    h) usage; exit 1;;
-    *) echo "Error: Unknown parameter '$OPTARG'."
-        exit 1;;
+PG_OPT=""
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --postgres) PG_OPT=${2-}; shift ;;
+    -y|--yes) YES=true ;;
+    --dry-run) DRY_RUN=true ;;
+    -h|--help) usage 0 ;;
+    -*) die "unknown option $1 (see $PROG --help)" ;;
+    *) ARGS+=("$1") ;;
   esac
+  shift
 done
-shift $(($OPTIND - 1))
+[[ $EUID -eq 0 ]] || die "please run with sudo"
 
-if [ "$#" -lt 1 ]; then
-  usage
-  exit 1
+NAME=${ARGS[0]-}
+[[ -n $NAME ]] || ask NAME "Instance to delete" "" "<instance>"
+check_missing
+PG=${PG_OPT:-${ARGS[1]-}}
+[[ -n $PG ]] || PG=$(lxc config get "$NAME" user.dhis2.postgres 2>/dev/null)
+PG=${PG:-postgres}
+PROXY=$(jq -r .proxy /usr/local/etc/dhis/containers.json)
+
+# Find what exists, so the summary lists only that (and a typo can't drop a same-named database on its own)
+FOUND=false
+IP=""
+if lxc info "$NAME" >/dev/null 2>&1; then
+  [[ $(lxc config get "$NAME" user.type) == "Tomcat server" ]] || die "$NAME is not a DHIS2 instance: refusing to delete it"
+  IP=$(lxc config device get "$NAME" eth0 ipv4.address 2>/dev/null)
+  summary Container "$NAME${IP:+ ($IP)}"
+  FOUND=true
+fi
+HAS_DB=false
+HAS_USER=false
+PGMAJOR=""
+if lxc info "$PG" >/dev/null 2>&1; then
+  if lxc exec "$PG" -- psql -lqt --csv | cut -d, -f1 | grep -qx "$NAME"; then HAS_DB=true; fi
+  if lxc exec "$PG" -- psql --csv -qt -c '\du' postgres | cut -d, -f1 | grep -qx "$NAME"; then HAS_USER=true; fi
+  PGMAJOR=$(lxc exec "$PG" -- psql -t -c 'show server_version' postgres | awk '{print int($1)}')
+fi
+if [[ $HAS_DB == true ]]; then summary Database "$NAME on $PG (all its data)"; FOUND=true; fi
+if [[ $HAS_USER == true ]]; then summary "DB user" "$NAME on $PG"; FOUND=true; fi
+HAS_HBA=false
+if [[ -n $PGMAJOR ]] && lxc exec "$PG" -- grep -q "^ *host $NAME $NAME " "/etc/postgresql/$PGMAJOR/main/pg_hba.conf"; then
+  summary "DB access" "the pg_hba.conf line and firewall rule for $NAME on $PG"
+  HAS_HBA=true
+fi
+case $PROXY in
+  nginx)   PROXY_FILES=("/etc/nginx/upstream/$NAME.conf" "/etc/nginx/upstream/$NAME-glowroot.conf") ;;
+  apache2) PROXY_FILES=("/etc/apache2/upstream/$NAME" "/etc/apache2/upstream/$NAME-glowroot") ;;
+  *) die "proxy type $PROXY not supported" ;;
+esac
+FOUND_FILES=()
+for F in "${PROXY_FILES[@]}"; do
+  if lxc exec proxy -- test -f "$F"; then FOUND_FILES+=("$F"); fi
+done
+if [[ ${#FOUND_FILES[@]} -gt 0 ]]; then summary Proxy "${FOUND_FILES[*]}"; FOUND=true; fi
+HAS_HOSTS=false
+if grep -q " $NAME$" /etc/hosts; then summary Hosts "the $NAME line in /etc/hosts"; HAS_HOSTS=true; FOUND=true; fi
+
+[[ $FOUND == true ]] || die "nothing named $NAME found (no container, database, proxy entry or hosts line)"
+summary Kept "its backups"
+confirm_summary "Delete $NAME? This cannot be undone" n
+
+if [[ ${#FOUND_FILES[@]} -gt 0 ]]; then
+  lxc exec proxy -- rm -f "${FOUND_FILES[@]}"
+  lxc exec proxy -- service "$PROXY" restart
 fi
 
-NAME=$1
-DBCONTAINER=${2:-postgres}
-
-if [[ $CONFIRM == true ]]; then
-  read -r -p "Delete container $NAME and drop database $NAME on $DBCONTAINER? This cannot be undone [y/N] " ANSWER
-  [[ $ANSWER =~ ^[Yy]$ ]] || { echo "Aborted"; exit 1; }
+if lxc info "$NAME" >/dev/null 2>&1; then
+  lxc stop "$NAME" 2>/dev/null
+  lxc delete "$NAME"
 fi
 
-if [[ $PROXY == "nginx" ]];
-then
-  lxc exec proxy -- rm -f /etc/nginx/upstream/${NAME}.conf /etc/nginx/upstream/${NAME}-glowroot.conf
-  lxc exec proxy -- service nginx restart
-elif [[ $PROXY == "apache2" ]];
-then
-  lxc exec proxy -- rm -f /etc/apache2/upstream/${NAME} /etc/apache2/upstream/${NAME}-glowroot
-  lxc exec proxy -- service apache2 restart
-else
-  echo "Error: Proxy type not supported"
-  exit 1
-fi
-
-# remember the IP before the container goes, to clean up database access below
-IP=$(lxc config device get $NAME eth0 ipv4.address 2>/dev/null)
-
-lxc stop $NAME
-lxc delete $NAME
-
-lxc exec ${DBCONTAINER} -- dropdb $NAME
-lxc exec ${DBCONTAINER} -- dropuser $NAME
+if [[ $HAS_DB == true ]]; then lxc exec "$PG" -- dropdb "$NAME"; fi
+if [[ $HAS_USER == true ]]; then lxc exec "$PG" -- dropuser "$NAME"; fi
 
 # remove the instance's access to postgres, so a future container reusing the IP doesn't inherit it
-PGMAJOR=$(lxc exec ${DBCONTAINER} -- psql -t -c 'show server_version' postgres | awk '{print int($1)}')
-lxc exec ${DBCONTAINER} -- sed -i "/^ *host ${NAME} ${NAME} /d" /etc/postgresql/$PGMAJOR/main/pg_hba.conf
-lxc exec ${DBCONTAINER} -- service postgresql reload
-if [[ -n $IP ]]; then
-  lxc exec ${DBCONTAINER} -- ufw delete allow proto tcp from $IP to any port 5432
+if [[ $HAS_HBA == true ]]; then
+  lxc exec "$PG" -- sed -i "/^ *host $NAME $NAME /d" "/etc/postgresql/$PGMAJOR/main/pg_hba.conf"
+  lxc exec "$PG" -- service postgresql reload
+  [[ -z $IP ]] || lxc exec "$PG" -- ufw delete allow proto tcp from "$IP" to any port 5432
 fi
 
-sudo sed -i "/ ${NAME}$/d" /etc/hosts
-
+if [[ $HAS_HOSTS == true ]]; then sed -i "/ ${NAME}$/d" /etc/hosts; fi
+echo "$NAME deleted"
