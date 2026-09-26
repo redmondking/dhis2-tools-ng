@@ -59,7 +59,7 @@ sed -i "s/LXD_NETWORK/192.168.0.0\/24/g" $tmp
 sed -i "s/INTERFACE/$DEFAULT_INTERFACE/" $tmp
 
 sudo mv $tmp /etc/ufw/before.rules
-sudo chown root.root /etc/ufw/before.rules
+sudo chown root:root /etc/ufw/before.rules
 sudo ufw reload
 fi
 lxc start $NAME

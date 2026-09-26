@@ -1,29 +1,29 @@
 {
-  "fqdn":"xxx.xxx.xxx",
+  "fqdn": "xxx.xxx.xxx",
   "email": "xxx@xxxx",
   "environment": {
-          "TZ": "Africa/Accra"
+    "TZ": "Africa/Accra"
   },
-  "network": "192.168.0.1/24", 
+  "network": "192.168.0.1/24",
   "monitoring": "munin",
   "apm": "glowroot",
-  "proxy": "apache2",
+  "glowroot_login": "shared",
+  "proxy": "nginx",
   "containers": [
     {
       "name": "proxy",
       "ip": "192.168.0.2",
-      "type": "apache_proxy"
+      "type": "nginx_proxy"
     },
     {
       "name": "postgres",
       "ip": "192.168.0.20",
       "type": "postgres"
     },
-    { 
+    {
       "name": "monitor",
       "ip": "192.168.0.30",
       "type": "munin_monitor"
     }
   ]
 }
-

@@ -5,16 +5,16 @@ apt-get -y install openjdk-JAVA_VERSION-jre-headless unzip
 apt-get -y install tomcat9 tomcat9-admin 
 
 rm -rf /var/lib/tomcat9/webapps/*
-chown -R root.root /var/lib/tomcat9/webapps
+chown -R root:root /var/lib/tomcat9/webapps
 
 mkdir /opt/dhis2
-chown -R tomcat.tomcat /opt/dhis2
+chown -R tomcat:tomcat /opt/dhis2
 
 echo "tomcat" >> /etc/cron.deny
 echo "tomcat" >> /etc/at.deny
 
 mkdir /opt/glowroot
-chown -R tomcat.tomcat /opt/glowroot
+chown -R tomcat:tomcat /opt/glowroot
 
 mkdir /etc/systemd/system/tomcat9.service.d
 
@@ -148,7 +148,7 @@ connection.schema = update
 # system.monitoring.password =
 EOF
 
-chown root.tomcat /opt/dhis2/dhis.conf
+chown root:tomcat /opt/dhis2/dhis.conf
 chmod 640 /opt/dhis2/dhis.conf
 
 ######################################################################################

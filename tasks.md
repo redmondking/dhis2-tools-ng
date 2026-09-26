@@ -5,7 +5,7 @@ Phases are roughly in order: each phase builds on the ones before it.
 
 Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
-## Phase 0 – Bug fixes (branch `fix/bugs`)
+## Phase 0 – Bug fixes
 
 - [~] 0.1 `dhis2-create-instance`: `-n` ignored, `JAVA_HOME` rendered as `java-{{ 17 }}-...`, gawk-only free-IP pick, prefix-matching name checks
 - [~] 0.2 `ssl_setup.sh`: renewal cron written to the host. Now uses certbot's own timer, with a prompt for auto-renewal
@@ -22,45 +22,70 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
   - Claude runs the tests over SSH first. The user re-runs them once all bugs are fixed.
   - Needs from the user: IP/host, SSH user and key access (root or passwordless sudo), and a test domain with DNS for the fqdn and subdomains (a wildcard record is simplest).
 - [ ] 1.2 Install with the **original** scripts (`a37e7db`) and create an instance with glowroot, then run `upgrade_setup.sh` and check every step
-- [ ] 1.3 Fresh install from `fix/bugs`, then check each fix:
-  - `-n`
-  - `JAVA_HOME`
-  - free-IP pick with a stopped container
-  - `certbot renew --dry-run`
-  - delete instance
-  - restore database
-  - `sysctl` values
-  - `iptables -t nat -S`
-  - rsyslog
-- [ ] 1.4 Merge `fix/bugs` into `master` and push
+- [ ] 1.3 Fresh install from `develop` on 24.04 (`DHIS2_TOOLS_BRANCH=develop` with the curl installer), then check:
+  - bug fixes:
+    - `-n`
+    - `JAVA_HOME`
+    - free-IP pick with a stopped container
+    - `certbot renew --dry-run`
+    - delete instance
+    - restore database
+    - `sysctl` values
+    - `iptables -t nat -S`
+    - rsyslog
+  - install/update:
+    - `dhis2-tools-update` (`--check`, update, `--rollback`)
+    - commands work from any directory
+  - Ubuntu packages:
+    - PostgreSQL 16 + PostGIS
+    - nginx + certbot (timer renews)
+    - containers on 24.04, instances on 22.04
+  - Glowroot login:
+    - shared and own modes
+    - `dhis2-glowroot-login` with and without an instance
+    - Glowroot 0.14.7 working on DHIS2 2.38 and 2.41
+  - Munin:
+    - asks for a login
+    - `/munin` stays closed without one
+  - `-g no` / `-m no` on instance creation
+- [ ] 1.4 Merge `develop` into `master` and push
 
-## Phase 2 – Modernise the base
+## Phase 2 – Install/update, lock down monitoring, modernise the base
 
-- [ ] 2.1 Proxy, postgres and monitor containers on Ubuntu 24.04 (`create_containers.sh`, `change_webserver.sh`)
-- [ ] 2.2 `postgres` type: PostgreSQL 16 + `postgis-3` using a keyring. Delete `postgres12` and `postgres12_postsetup`
-- [ ] 2.3 Replace `apt-key` with `/etc/apt/keyrings` + `signed-by` (postgres, nginx)
-- [ ] 2.4 Tomcat per instance: `tomcat9` on 22.04 or `tomcat10` on 24.04, stored as `user.dhis2.tomcat`.
-      Remove the hardcoded `tomcat9` from:
+- [~] 2.1 Proxy, postgres and monitor containers on Ubuntu 24.04 (`create_containers.sh`, `change_webserver.sh`); instances on 22.04 until phase 3
+- [~] 2.2 `postgres` type: PostgreSQL 16 + `postgis-3` from Ubuntu's own packages. `postgres12` deleted
+- [~] 2.3 No `apt-key` left: postgres, nginx and certbot now come from Ubuntu's own packages (no third-party repos, no snap)
+- [ ] 2.5 Check that DHIS2 2.38 runs on PostgreSQL 16. If not, support a second postgres container on 14 (on the test server)
+- [~] 2.6 Proxy configs: OCSP stapling and `X-XSS-Protection` removed. `listen … http2` kept, because nginx 1.24 has no `http2 on;`
+- [~] 2.7 Glowroot: one version (0.14.7) for every Java version
+- [~] 2.8 `chown x.y` → `x:y`
+- [~] 2.9 Deleted `configs/containers.json.exampleused` and `setup/destroy` (`.DS_Store` was never in the repo)
+- [~] 2.10 `containers.json.sample` defaults to nginx (the wizard follows in phase 5)
+- [~] 2.12 Install into `/opt/dhis2-tools` with `dhis2-*` commands in `/usr/local/bin`. `install.sh` = first install + `dhis2-tools-update`
+      (`--check` exits 2, `-y`, `--rollback`), updating from hardcoded `redmondking/dhis2-tools-ng` master
+- [~] 2.13 Shared helper file `lib/dhis2-lib.sh`: prompts that never hang without a terminal, `--password-stdin`, Glowroot password hash
+      (checked against Glowroot's own code)
+- [~] 2.14 Glowroot login: no more anonymous admin. Shared or per-instance login, `dhis2-glowroot-login`, `-g`/`-U` on instance creation
+- [~] 2.15 Munin login on `/munin` (`dhis2-munin-login`), Munin optional per instance (`-m`). `dhis2-tomcat-munin` fixed and safe to re-run
+- [~] 2.16 `dhis2-upgrade-setup` for running servers:
+  - replaces old copied scripts with links
+  - closes open Munin/Glowroot pages
+  - patches `tomcat_setup`
+  - asks about all restarts at the end
+
+Moved: 2.4 (Tomcat per instance) → 3.0; 2.11 (switch apache servers to nginx) → 8.8.
+
+## Phase 3 – Multiple DHIS2 versions
+
+- [ ] 3.0 Tomcat per instance: `tomcat9` on 22.04 or `tomcat10` on 24.04, stored as `user.dhis2.tomcat`. Remove the hardcoded `tomcat9` from:
   - `etc/tomcat_setup`
   - `etc/tomcat_default`
   - `dhis2-create-instance`
   - `dhis2-deploy-war`
   - `dhis2-logview`
   - `dhis2-tomcat-munin`
-- [ ] 2.5 Check that DHIS2 2.38 runs on PostgreSQL 16. If not, support a second postgres container on 14
-- [ ] 2.6 Proxy configs:
-  - remove OCSP stapling
-  - `http2 on;`
-  - drop `X-XSS-Protection`
-- [ ] 2.7 Glowroot: one version setting instead of two hardcoded ones
-- [ ] 2.8 `chown root.root` → `root:root`, `tomcat.tomcat` → `tomcat:tomcat`
-- [ ] 2.9 Delete `setup/.DS_Store`, `configs/containers.json.exampleused`, `setup/destroy`
-- [ ] 2.10 nginx is the only proxy for new installs: make `containers.json.sample` and the wizard default to nginx, with no apache choice
-- [ ] 2.11 `upgrade_setup.sh`: on apache servers, offer to switch to nginx via `change_webserver.sh`.
-      Delete apache support (`containers/apache_proxy*`, `configs/apache-dhis2.conf`, apache branches) once that switch is tested
-
-## Phase 3 – Multiple DHIS2 versions
-
+  - `dhis2-glowroot-login`
+  - `upgrade_setup.sh`
 - [ ] 3.1 Shared helpers for the service scripts:
   - read the release feed
   - prompts with defaults (`ask`, `menu`, `confirm`)
@@ -205,6 +230,9 @@ Testing: connect ✓  write ✓  delete test file ✓
       Tell the user the remote copy will receive the new layout, and that the old remote folders are left for them to remove.
 - [ ] 8.7 Turn an old `REMOTE=` setting in `dhis2-env` into remote `remote1`, SSH type, mode `keep` (same behaviour as before)
 
+- [ ] 8.8 On apache servers, offer to switch to nginx (rework `change_webserver.sh`: hardcoded 192.168.0.3 and network, per-hostname layout).
+      Delete apache support (`containers/apache_proxy*`, `configs/apache-dhis2.conf`, apache branches) once that switch is tested
+
 ## Phase 9 – DHIS2 version upgrade script (last)
 
 - [ ] 9.1 Design first. Things to handle:
@@ -227,6 +255,12 @@ Testing: connect ✓  write ✓  delete test file ✓
 
 - [ ] 10.1 Rewrite `README.md` and `docs/`, which describe Ubuntu 18.04, PostgreSQL 10 and a 2.33 war
 - [ ] 10.2 Switch prompts to `whiptail` once everything above is tested
+
+## Later
+
+- [ ] Turn Glowroot or Munin on or off for an existing instance (e.g. `dhis2-glowroot enable <instance>`)
+- [ ] Alerts when a remote backup fails (6.12)
+- [ ] `setup.sh --answers` replay of a previous wizard run
 
 ## Decisions from the open questions (2026-09-25)
 

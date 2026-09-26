@@ -58,7 +58,7 @@ for CONTAINER in $CONTAINERS; do
     sed -i "s/INTERFACE/$DEFAULT_INTERFACE/" $tmp
 
     sudo mv $tmp /etc/ufw/before.rules
-    sudo chown root.root /etc/ufw/before.rules
+    sudo chown root:root /etc/ufw/before.rules
     sudo ufw reload
   fi
   lxc start $NAME
