@@ -74,6 +74,8 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
     - `dhis2-create-instance` interactively: the create/deploy menu, the source menu, own war file and URL, `--based-on`,
       create only (`--line`), summary and "Create it?"; checksum failure menu with "choose another release"
     - `dhis2-create-instance -y` from a script with `--secrets-stdin`, and `--dry-run` (nothing created)
+    - `dhis2-deploy-war` interactively: source menu, summary, going back with `--force` (typed instance name), a create-only
+      instance getting its first release; `-y` and `--dry-run` from a script
 - [ ] 1.4 Merge `develop` into `master` and push
 
 ## Phase 2 – Install/update, lock down monitoring, modernise the base
@@ -164,7 +166,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   - `--dry-run`
   - `--ip`, `--postgres` as named flags; the positional forms keep working
   - two possible secrets (Glowroot password, and the DHIS2 admin password from 5.3): see the secrets rule in `architecture.md` section 12
-- [ ] 3b.3 `dhis2-deploy-war`:
+- [~] 3b.3 `dhis2-deploy-war` (also 3b.16 for this command):
   - the same "where does DHIS2 come from" menu
   - `--based-on`, `--sha256`, and "choose another release" on a checksum failure
   - summary + confirm, `--dry-run`
