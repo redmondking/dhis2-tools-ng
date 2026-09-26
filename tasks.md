@@ -145,7 +145,7 @@ Requirements agreed with the user on 2026-09-26.
 
 Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-09-26. New commands follow the rules when they are built (flags listed in their phase below).
 
-- [ ] 3b.1 Shared helpers: `need_flags` (collect every missing flag, then one error with exit 3), a summary/confirm helper,
+- [~] 3b.1 Shared helpers: `need_flags` (collect every missing flag, then one error with exit 3), a summary/confirm helper,
       `--secrets-stdin` reader (JSON object on stdin, keys like `glowroot_password`; see `architecture.md` section 12), and "no terminal: add -y" (exit 3)
 - [ ] 3b.2 `dhis2-create-instance`:
   - first question: 1) create and deploy DHIS2 2) create only (`--no-deploy`); create only asks the version line (`--line 2.42`)

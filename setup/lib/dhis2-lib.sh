@@ -2,17 +2,43 @@
 # Service scripts source it with:
 #   source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
 #
-# Prompts only happen on a terminal. Without one (Ansible, the management app, cron) a value
-# falls back to its default, or the script stops and names the option that supplies it.
-# Prompts go to stderr, so stdout stays clean for output other programs read.
+# Command and flag rules: architecture.md section 12. In short:
+# - prompts only when interactive (a terminal, and no -y); otherwise defaults are used and anything without a default
+#   is collected with require/ask, then check_missing reports all of it at once (exit 3)
+# - a summary before changing anything: confirm_summary (handles --dry-run, -y, no terminal)
+# - secrets come from --secrets-stdin (secrets_load/secret) or are typed at a prompt, never from argv
+# Prompts and errors go to stderr, so stdout stays clean for output other programs read.
+
+YES=${YES:-false}          # -y: ask nothing
+DRY_RUN=${DRY_RUN:-false}  # --dry-run: show the summary, change nothing
+SECRETS=""                 # JSON object from --secrets-stdin
+MISSING=()                 # inputs still needed, reported by check_missing
+SUMMARY=()                 # lines shown by confirm_summary
 
 die() { echo "Error: $*" >&2; exit 1; }
+die_missing() { echo "Error: $*" >&2; exit 3; }
 
-# ask VAR "question" [default] [option]
+# interactive: may we ask? Only on a terminal, and never with -y.
+interactive() { [[ -t 0 && $YES != true ]]; }
+
+# require VALUE FLAG DESCRIPTION: note FLAG as missing when VALUE is empty
+require() { [[ -n $1 ]] || MISSING+=("$(printf '%-34s  %s' "$2" "$3")"); }
+
+# check_missing: stop with one error listing every missing input (exit 3)
+check_missing() {
+  [[ ${#MISSING[@]} -eq 0 ]] && return 0
+  {
+    echo "Error: missing input (needed with -y or without a terminal):"
+    printf '  %s\n' "${MISSING[@]}"
+  } >&2
+  exit 3
+}
+
+# ask VAR "question" [default] [flag]: without a prompt, the default; with no default the flag is noted as missing
 ask() {
   local __var=$1 __question=$2 __default=${3-} __option=${4-} __answer=""
-  if [[ ! -t 0 ]]; then
-    [[ -n $__default ]] || die "no value for \"$__question\"${__option:+, give it with $__option}"
+  if ! interactive; then
+    [[ -n $__default ]] || require "" "${__option:-?}" "$__question"
     printf -v "$__var" '%s' "$__default"
     return 0
   fi
@@ -23,10 +49,10 @@ ask() {
   printf -v "$__var" '%s' "$__answer"
 }
 
-# ask_yes_no "question" y|n   -> returns 0 for yes. Without a terminal: the default.
+# ask_yes_no "question" y|n   -> returns 0 for yes. Without a prompt: the default.
 ask_yes_no() {
   local __default=${2:-y} __answer
-  if [[ ! -t 0 ]]; then [[ $__default == y ]]; return; fi
+  if ! interactive; then [[ $__default == y ]]; return; fi
   if [[ $__default == y ]]; then
     read -r -p "$1 [Y/n] " __answer
     [[ ! $__answer =~ ^[Nn] ]]
@@ -36,15 +62,50 @@ ask_yes_no() {
   fi
 }
 
-# ask_password VAR "label" [from_stdin]
-# from_stdin=true: read one line from stdin (--password-stdin). Otherwise ask twice on the terminal.
+# summary LABEL TEXT: add a line to the summary shown by confirm_summary
+summary() { SUMMARY+=("$(printf '%-12s %s' "$1" "$2")"); }
+
+# confirm_summary QUESTION: show the summary, then go ahead only when confirmed.
+# --dry-run: stop here (exit 0). -y: go ahead. No terminal: exit 3. "n": nothing changed (exit 1).
+confirm_summary() {
+  local __answer
+  echo
+  printf '  %s\n' "${SUMMARY[@]}"
+  echo
+  if [[ $DRY_RUN == true ]]; then echo "Dry run: nothing changed."; exit 0; fi
+  [[ $YES == true ]] && return 0
+  [[ -t 0 ]] || die_missing "no terminal to confirm: add -y to go ahead without asking"
+  read -r -p "$1 [Y/n] " __answer
+  if [[ $__answer =~ ^[Nn] ]]; then echo "Nothing changed." >&2; exit 1; fi
+  return 0
+}
+
+# secrets_load ALLOWED_KEY...: read the --secrets-stdin JSON object; unknown keys are refused (so a typo can't pass unnoticed)
+secrets_load() {
+  local allowed bad
+  SECRETS=$(cat)
+  jq -e 'type == "object"' <<< "$SECRETS" >/dev/null 2>&1 || die "--secrets-stdin: stdin is not a JSON object"
+  allowed=$(printf '%s\n' "$@" | jq -R . | jq -sc .)
+  bad=$(jq -r --argjson ok "$allowed" 'keys - $ok | join(", ")' <<< "$SECRETS")
+  [[ -z $bad ]] || die "--secrets-stdin: unknown key(s): $bad (allowed: $*)"
+}
+
+# secret PATH: a value from the secrets, e.g. secret glowroot_password, secret glowroot_passwords.hmis; returns 1 if absent
+secret() {
+  [[ -n $SECRETS ]] || return 1
+  jq -er --arg p "$1" 'getpath($p | split(".")) | strings | select(length > 0)' <<< "$SECRETS" 2>/dev/null
+}
+
+# ask_password VAR "label" [secret_key]: the password from --secrets-stdin (secret_key), else typed twice at a prompt,
+# else noted as missing. (Until 3b.15 moves its callers over, "true" as third argument still reads one line of stdin.)
 ask_password() {
-  local __var=$1 __label=$2 __from_stdin=${3:-false} __p1="" __p2=""
-  if [[ $__from_stdin == true ]]; then
+  local __var=$1 __label=$2 __key=${3-} __p1="" __p2=""
+  if [[ $__key == true ]]; then
     IFS= read -r __p1 || true
     [[ -n $__p1 ]] || die "no $__label password on stdin"
-  else
-    [[ -t 0 ]] || die "no terminal to ask for the $__label password, give it with --password-stdin"
+  elif [[ -n $__key && $__key != false ]] && __p1=$(secret "$__key"); then
+    :
+  elif interactive; then
     while true; do
       IFS= read -r -s -p "$__label password: " __p1; echo >&2
       IFS= read -r -s -p "Repeat $__label password: " __p2; echo >&2
@@ -53,6 +114,8 @@ ask_password() {
       else break
       fi
     done
+  else
+    require "" "--secrets-stdin  \"${__key:-password}\"" "the $__label password"
   fi
   printf -v "$__var" '%s' "$__p1"
 }
@@ -154,6 +217,11 @@ feed_release() {
   IFS=$'\t' read -r REL_NAME REL_URL REL_SHA REL_JDK REL_LINE <<< "$row"
 }
 
+# feed_line_jdk LINE: the Java version for a version line
+feed_line_jdk() {
+  jq -r --arg line "$1" '.versions[] | select(.name == $line) | .jdk' <<< "$FEED"
+}
+
 # feed_newest [LINE]: newest release overall, or in LINE
 feed_newest() {
   jq -r --arg line "${1-}" --argjson oldest $OLDEST_LINE '
@@ -163,6 +231,7 @@ feed_newest() {
 
 # ask_release VAR [LINE] [CURRENT] [GIVEN]: the release to use, from GIVEN (-V) or asked on the terminal.
 # Only checks that the release exists (and is 2.38+); leaves REL_* set for it.
+# Without a prompt and without GIVEN: notes -V as missing and returns 1.
 ask_release() {
   local __var=$1 __line=${2-} __current=${3-} __given=${4-} __default __answer
   __default=$(feed_newest "$__line")
@@ -171,7 +240,10 @@ ask_release() {
     printf -v "$__var" '%s' "$__given"
     return 0
   fi
-  [[ -t 0 ]] || die "no DHIS2 release given: use -V <release>, e.g. -V $__default"
+  if ! interactive; then
+    require "" "-V/--release <release>" "DHIS2 release, exact name (e.g. $__default)"
+    return 1
+  fi
   echo "DHIS2 releases (end of support = no more security fixes):" >&2
   feed_show "$__line" "$__current" >&2
   while true; do
@@ -201,7 +273,8 @@ instance_tomcat() {
 }
 
 # download_war DIR: download the release in REL_* to DIR/dhis.war and check it against the published sha256.
-# Tries 3 times, then asks whether to try again (no terminal: returns 1). There is no "use it anyway".
+# Tries 3 times, then asks: 1) try again 2) choose another release 3) stop. There is no "use it anyway".
+# Returns 0 ok, 1 stop (also without a prompt), 2 choose another release.
 download_war() {
   local dir=$1 attempt choice
   while true; do
@@ -214,12 +287,17 @@ download_war() {
       fi
       echo "The download failed or does not match its published checksum" >&2
     done
-    [[ -t 0 ]] || return 1
+    interactive || return 1
     echo "The download of $REL_NAME does not match its published checksum (tried 3 times)." >&2
     echo "  1) Try again" >&2
-    echo "  2) Stop" >&2
+    echo "  2) Choose another release" >&2
+    echo "  3) Stop" >&2
     read -r -p "Choice [1]: " choice
-    [[ ${choice:-1} == 1 ]] || return 1
+    case ${choice:-1} in
+      1) ;;
+      2) return 2 ;;
+      *) return 1 ;;
+    esac
   done
 }
 
