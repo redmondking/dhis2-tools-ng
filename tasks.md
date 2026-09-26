@@ -76,6 +76,8 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
     - `dhis2-create-instance -y` from a script with `--secrets-stdin`, and `--dry-run` (nothing created)
     - `dhis2-deploy-war` interactively: source menu, summary, going back with `--force` (typed instance name), a create-only
       instance getting its first release; `-y` and `--dry-run` from a script
+    - `dhis2-restoredb` into a running instance: tomcat stops, the restore runs, tomcat starts; with a broken dump it must
+      exit non-zero and still start tomcat
     - `dhis2-delete-instance --dry-run`, then a real delete; `dhis2-delete-instance postgres` must refuse
     - `dhis2-ssl-setup --dry-run` (staging test), then a real run; without a terminal and without `-y` it must stop (exit 3)
     - `dhis2-logview`: `-f`, `-r`, `-g` with quotes and `;` in the text (must only search), `-S`/`-U`, `-n`, `--json` on Tomcat 9 and 10
@@ -174,7 +176,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   - `--based-on`, `--sha256`, and "choose another release" on a checksum failure
   - summary + confirm, `--dry-run`
 - [~] 3b.4 `dhis2-delete-instance` (also refuses containers that are not DHIS2 instances; confirmation defaults to No): `--dry-run` (lists everything that would be removed), `--postgres`, "add -y" without a terminal, errors to stderr
-- [ ] 3b.5 `dhis2-restoredb`: summary; when the database belongs to an instance, stop its Tomcat, restore, start it again
+- [~] 3b.5 `dhis2-restoredb` (also: a failure anywhere in the restore pipe now fails the command; the dump is checked with `gzip -t` first): summary; when the database belongs to an instance, stop its Tomcat, restore, start it again
       (shown in the summary); `--dry-run`, `--postgres` (no longer hardcoded; from phase 6 the default comes from the instance's
       `user.dhis2.postgres` label), "add -y" without a terminal
 - [ ] 3b.6 `dhis2-dbactivity --json`, `--postgres`

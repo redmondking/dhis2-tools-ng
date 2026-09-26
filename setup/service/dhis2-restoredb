@@ -7,49 +7,77 @@
 #
 #   DHIS2 restore database backup
 
-set -e
-
-PROG=`basename $0`
+PROG=$(basename "$0")
+# shellcheck source=../lib/dhis2-lib.sh
+source "$(dirname "$(readlink -f "$0")")/../lib/dhis2-lib.sh"
 
 usage() {
-  echo "Usage: $PROG [-y] <backup file (sql.gz)> <dbname>"
-  echo "  backup file: gzipped plain sql dump, as made by dhis2-backup"
-  echo "  dbname: the name of the database to restore"
-  echo "Options:"
-  echo "  -y               Do not ask for confirmation"
-  echo "  -h, --help       Display this help message"
+  cat <<EOF
+Usage: $PROG [options] <backup file (sql.gz)> <database>
+  backup file   gzipped plain sql dump, as made by dhis2-backup
+  database      the database to replace (for a DHIS2 instance: its name)
+If the database belongs to a DHIS2 instance, its tomcat is stopped during the restore and started again after.
+Options:
+      --postgres <container>  postgres container holding the database (default: postgres)
+  -y, --yes                   do not ask for confirmation
+      --dry-run               show what would be replaced, change nothing
+  -h, --help                  this help
+Exit codes: 0 ok, 1 failure or refused, 3 missing input (e.g. no terminal to confirm: add -y).
+EOF
+  exit "${1:-1}"
 }
 
-CONFIRM=true
-while getopts hy opt
-do
-  case $opt in
-    y) CONFIRM=false;;
-    *) usage; exit 1;;
+PG_OPT=""
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --postgres) PG_OPT=${2-}; shift ;;
+    -y|--yes) YES=true ;;
+    --dry-run) DRY_RUN=true ;;
+    -h|--help) usage 0 ;;
+    -*) die "unknown option $1 (see $PROG --help)" ;;
+    *) ARGS+=("$1") ;;
   esac
+  shift
 done
-shift $((OPTIND - 1))
+[[ $EUID -eq 0 ]] || die "please run with sudo"
 
-if [ "$#" -ne 2 ]; then
-  usage
-  exit 1
+BACKUPFILE=${ARGS[0]-}
+DB=${ARGS[1]-}
+[[ -n $BACKUPFILE ]] || ask BACKUPFILE "Backup file" "" "<backup file>"
+[[ -n $DB ]] || ask DB "Database to replace" "" "<database>"
+check_missing
+[[ -f $BACKUPFILE ]] || die "no such file: $BACKUPFILE"
+gzip -t "$BACKUPFILE" 2>/dev/null || die "not a gzipped sql dump: $BACKUPFILE"
+
+INSTANCE=false
+if [[ $(lxc config get "$DB" user.type 2>/dev/null) == "Tomcat server" ]]; then
+  INSTANCE=true
+  TOMCAT=$(instance_tomcat "$DB")
 fi
+PG=${PG_OPT:-}
+[[ -n $PG || $INSTANCE == false ]] || PG=$(lxc config get "$DB" user.dhis2.postgres)
+PG=${PG:-postgres}
+lxc info "$PG" >/dev/null 2>&1 || die "no such container: $PG"
+lxc exec "$PG" -- psql --csv -qt -c '\du' postgres | cut -d, -f1 | grep -qx "$DB" \
+  || die "there is no database user $DB on $PG to own the restored database"
 
-BACKUPFILE=$1
-DB=$2
+summary Database "$DB on $PG: its current contents are dropped and replaced"
+summary Backup "$BACKUPFILE ($(du -h "$BACKUPFILE" | cut -f1))"
+[[ $INSTANCE == false ]] || summary Instance "$DB: $TOMCAT stops during the restore and starts again after"
+confirm_summary "Replace database $DB?" n
 
-if [ ! -f "$BACKUPFILE" ]; then
-  echo "No such file: $BACKUPFILE"
-  exit 1
-fi
+[[ $INSTANCE == false ]] || lxc exec "$DB" -- service "$TOMCAT" stop
+RC=0
+{
+  lxc exec "$PG" -- dropdb --if-exists "$DB" &&
+  lxc exec "$PG" -- createdb -O "$DB" "$DB" &&
+  # every step of the pipe must succeed, so a truncated or corrupt backup is not reported as restored
+  ( set -o pipefail; gzip -dc "$BACKUPFILE" | grep -v 'ALTER .* OWNER' | lxc exec "$PG" -- psql "$DB" ) &&
+  echo "REASSIGN OWNED BY root TO \"$DB\"" | lxc exec "$PG" -- psql "$DB"
+} || RC=1
+# start the instance again even when the restore failed
+[[ $INSTANCE == false ]] || lxc exec "$DB" -- service "$TOMCAT" start
 
-if [[ $CONFIRM == true ]]; then
-  read -r -p "Replace database $DB with the contents of $BACKUPFILE? The current $DB will be dropped [y/N] " ANSWER
-  [[ $ANSWER =~ ^[Yy]$ ]] || { echo "Aborted"; exit 1; }
-fi
-
-sudo lxc exec postgres -- dropdb --if-exists $DB
-sudo lxc exec postgres -- createdb -O $DB $DB
-zcat $BACKUPFILE | grep -v 'ALTER .* OWNER' | sudo lxc exec postgres -- psql $DB
-echo "REASSIGN OWNED BY root TO $DB" | sudo lxc exec postgres -- psql $DB
-
+[[ $RC -eq 0 ]] || die "the restore of $DB failed (see the messages above)"
+echo "$DB restored from $BACKUPFILE"
