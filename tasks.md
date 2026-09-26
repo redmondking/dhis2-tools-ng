@@ -144,7 +144,7 @@ Requirements agreed with the user on 2026-09-26.
 Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New commands follow the rules when they are built (flags listed in their phase below).
 
 - [ ] 3b.1 Shared helpers: `need_flags` (collect every missing flag, then one error with exit 3), a summary/confirm helper,
-      `--secrets-stdin` reader, and "no terminal: add -y" (exit 3)
+      a password-file reader (see the secrets rule in `CLAUDE.md`), and "no terminal: add -y" (exit 3)
 - [ ] 3b.2 `dhis2-create-instance`:
   - first question: 1) create and deploy DHIS2 2) create only (`--no-deploy`)
   - "where does DHIS2 come from": 1) official release (`-V`) 2) own war file (`-f`) 3) own war at a URL (`-l`)
@@ -156,6 +156,7 @@ Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New command
   - `-y` (all required flags, see the table in `CLAUDE.md`'s rules; defaults: IP, postgres, Glowroot user `admin`, deploy)
   - `--dry-run`
   - `--ip`, `--postgres` as named flags; the positional forms keep working
+  - two possible secrets (Glowroot password, and the DHIS2 admin password from 5.3): see the secrets rule in `CLAUDE.md`
 - [ ] 3b.3 `dhis2-deploy-war`:
   - the same "where does DHIS2 come from" menu
   - `--based-on`, `--sha256`, and "choose another release" on a checksum failure
@@ -170,6 +171,8 @@ Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New command
   - `-y`, `--renew yes|no`, `--dry-run` (certbot's `--dry-run` against the Let's Encrypt test server)
   - **fix:** without a terminal it currently skips its "are you sure?" menu and requests the certificate
 - [ ] 3b.10 `dhis2-upgrade-setup --dry-run` (report what each step would change)
+- [ ] 3b.14 `dhis2-upgrade-setup` takes the Munin and Glowroot passwords as flags (agreed 2026-09-26), so automation can close
+      open Munin/Glowroot pages without a terminal. Also the Glowroot login mode (`--glowroot-login shared|own`) and usernames
 - [ ] 3b.11 `dhis2-tools-update --check --json` → `{"current", "latest", "update_available"}`
 - [ ] 3b.12 `dhis2-glowroot-login` / `dhis2-munin-login`: `--dry-run` (which instances would change and restart)
 - [ ] 3b.13 `dhis2-tomcat-munin`: stop at the first failure and exit non-zero
@@ -209,8 +212,7 @@ Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New command
   - If either differs, wait until DHIS2 is up and change it through the API.
   - Skip this step when the instance was restored from a backup.
 - [ ] 5.4 Memory for the instance (Java heap + container limit), default based on free RAM (`--memory <size>`)
-- Automation: the admin login is a second secret next to the Glowroot password, so `dhis2-create-instance` takes both with
-  `--secrets-stdin` (`glowroot_password`, `admin_password`); `--admin-user`
+- Automation: `--admin-user`; the admin password is a second secret next to the Glowroot password (see the secrets rule in `CLAUDE.md`)
 
 ## Phase 6 – Backups
 
@@ -268,15 +270,15 @@ Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New command
   - A failed remote doesn't stop the others.
   - Results are logged to `/var/log/dhis2-backup.log` and shown by `list`.
 - [ ] 6.11 Setup wizard asks "Add a remote backup location now? [y/N]" and runs `add`.
-- [ ] 6.13 `dhis2-list-backups [instance] [--json]` (new): instance, date, type, size, files archive yes/no, encrypted yes/no.
+- [ ] 6.13 `dhis2-list-backups [instance] [--json]` (new, agreed 2026-09-26): instance, date, type, size, files archive yes/no, encrypted yes/no.
       The Nuxt app's backup screen and the restore menu (7.1) use it
 - [ ] 6.14 `dhis2-backup --json`: per instance, whether the database and the file store succeeded, and where they were written
 - Automation of `dhis2-backup-remote`:
   - `add` takes `--name --type ssh|cloud --host --user --path --mode keep|mirror`
   - `list --json`; `test` sets the exit code; `sync --dry-run` (rsync `-n` / rclone `--dry-run`); `remove -y`
   - SSH key install needs the remote password (`ssh-copy-id`), so without a terminal: `--install-key no` prints the public key
-    for the caller to add on the remote
-  - cloud credentials via `--secrets-stdin`
+    for the caller to add on the remote (agreed 2026-09-26)
+  - cloud credentials as secrets (see the secrets rule in `CLAUDE.md`)
 - [ ] 6.12 Later: alert on failure (e.g. email to the address in `containers.json`). No `fetch` from remotes (user decision).
 
 Example:

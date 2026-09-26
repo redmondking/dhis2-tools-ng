@@ -63,7 +63,8 @@ Agreed with the user 2026-09-26. Existing commands are brought in line in phase 
   Automation therefore always passes `-y`, and nothing ever hangs.
 - Secrets never go in argv (visible in `ps`):
   - one secret: `--password-stdin` (like `docker login`)
-  - several secrets in one command: `--secrets-stdin`, a JSON object on stdin (e.g. `{"glowroot_password": "...", "admin_password": "..."}`)
+  - several secrets in one command: **pending the user's answer**. Proposed: one `--<what>-password-file <file|->` flag per secret
+    (`-` = stdin), e.g. `--glowroot-password-file`, `--admin-password-file`. JSON on stdin was rejected (too cumbersome for people).
   - install: inside the `--config` JSON
 
 **Before changing anything**
