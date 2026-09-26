@@ -46,14 +46,46 @@ Nothing here runs on macOS, so check syntax locally with `bash -n` and `shellche
 ## Future management system
 
 The user will later build a Nuxt web app to manage servers: deploy instances on existing servers, manage backups, and so on.
-It will drive these scripts, probably over `ssh <server> sudo <command>`. So every script must be automatable:
+It will drive these scripts, probably over `ssh <server> sudo <command>`, and Ansible may drive them too.
+So every command follows the rules below.
 
-- Every input has a flag. Prompts appear only when a value is missing **and** stdin is a TTY.
-- When stdin is not a TTY and a required value is missing, exit non-zero naming the missing flag. Never hang waiting for input.
-- Secrets never go in argv (visible in `ps`). Read them from stdin (`--password-stdin`, like `docker login`) or from the `--config` JSON.
-- Destructive actions take `-y` to skip confirmation.
-- Exit code 0 on success, non-zero on failure. Errors go to stderr.
-- List and status commands get a `--json` output as they are built (`dhis2-list-instances`, backups, remotes).
+## Command and flag rules (every `dhis2-*` command, existing and new)
+
+Agreed with the user 2026-09-26. Existing commands are brought in line in phase 3b; new commands follow the rules from the start.
+
+**Inputs**
+- Every input has a flag. Positional arguments are only for the main subject (usually the instance name).
+  Any other positional argument also gets a named flag (e.g. `--ip`, `--postgres`).
+- Prompts appear only on a terminal, and only for values not given as flags.
+- `-y` means nothing is asked at all. Every required answer must come from a flag, or from a default documented as safe.
+  If anything is missing, the command stops **before changing anything** and lists **all** missing flags in one error (exit 3).
+- Without `-y` and without a terminal, nothing can be asked, including a confirmation. The command stops and says to add `-y` (exit 3).
+  Automation therefore always passes `-y`, and nothing ever hangs.
+- Secrets never go in argv (visible in `ps`):
+  - one secret: `--password-stdin` (like `docker login`)
+  - several secrets in one command: `--secrets-stdin`, a JSON object on stdin (e.g. `{"glowroot_password": "...", "admin_password": "..."}`)
+  - install: inside the `--config` JSON
+
+**Before changing anything**
+- A command that changes things shows a **summary** of what it will do. On a terminal it asks to confirm; `-y` skips that.
+- `--dry-run` on every command that changes state: check everything, print the summary (what would change and whether it
+  would be refused), change nothing. Exit 0, or the exit code the real run would give if it would be refused (1 or 3).
+- Destructive or risky actions need confirmation. The riskiest (e.g. going back to an older DHIS2 release) also need `--force`,
+  plus typing the instance name on a terminal, or `--force -y` without one.
+
+**Output**
+- `--json` on every list/status command. Missing values are `null`. With `--json`, stdout is pure JSON; everything else goes to stderr.
+- Errors go to stderr through `die` (`lib/dhis2-lib.sh`).
+- `-h`/`--help` lists every flag with its default, and exits 0.
+
+**Exit codes**
+- 0 success (also for `--dry-run`)
+- 1 failure, or refused
+- 2 update available (`dhis2-tools-update --check` only)
+- 3 missing input (a required flag was not given, or a confirmation is needed and there is no terminal)
+- A command never exits 0 after a partial failure: e.g. one failed database in a backup run means a non-zero exit.
+
+**State**
 - All state lives on the server: container labels `user.dhis2.*` and files in `/usr/local/etc/dhis`. Nothing is kept only in the tool's memory.
 - Re-running a command should be safe (check before changing).
 

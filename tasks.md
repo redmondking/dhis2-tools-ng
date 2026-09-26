@@ -9,8 +9,9 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 - Branch `develop`, nothing pushed. `master` is still the original code (`a37e7db`).
 - Phases 0, 2 and 3 are written and committed. Nothing has been tested on a real server yet: all `[~]`.
-- **Next step:** discuss and agree the phase 4 requirements (hostnames and paths; the design is already in `CLAUDE.md`),
-  then plan in plan mode.
+- Command and flag rules agreed and written into `CLAUDE.md`. Every command was audited; the results are phase 3b
+  (existing commands) and the automation notes in phases 4–9 (new commands).
+- **Next step:** plan phase 3b in plan mode, then implement. Then phase 4 (hostnames and paths).
 - Testing (phase 1) waits until the scripts are written, as the user asked.
   Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
 - Until `develop` is merged, install on the test server with
@@ -138,26 +139,62 @@ Requirements agreed with the user on 2026-09-26.
 - Checked locally: feed helpers against the live feed; a real 2.38.7 war downloaded, checksum ok, release read from it;
   every `dhis2-deploy-war` rule with a stand-in `lxc`; `dhis2-list-instances` table and `--json`.
 
+## Phase 3b – Existing commands follow the command and flag rules
+
+Rules: `CLAUDE.md`, "Command and flag rules". Audit done 2026-09-26. New commands follow the rules when they are built (flags listed in their phase below).
+
+- [ ] 3b.1 Shared helpers: `need_flags` (collect every missing flag, then one error with exit 3), a summary/confirm helper,
+      `--secrets-stdin` reader, and "no terminal: add -y" (exit 3)
+- [ ] 3b.2 `dhis2-create-instance`:
+  - first question: 1) create and deploy DHIS2 2) create only (`--no-deploy`)
+  - "where does DHIS2 come from": 1) official release (`-V`) 2) own war file (`-f`) 3) own war at a URL (`-l`)
+    - own war: its release is read from `dhis-api-*.jar` and decides Ubuntu/tomcat/java. If it can't be read, ask which version it is
+      based on (`--based-on 2.41`) and record the version as `custom`. Optional `--sha256`.
+    - label `user.dhis2.source` = `official` or `custom`
+  - checksum failure menu: 1) try again 2) choose another release 3) stop
+  - summary + "Create it?"
+  - `-y` (all required flags, see the table in `CLAUDE.md`'s rules; defaults: IP, postgres, Glowroot user `admin`, deploy)
+  - `--dry-run`
+  - `--ip`, `--postgres` as named flags; the positional forms keep working
+- [ ] 3b.3 `dhis2-deploy-war`:
+  - the same "where does DHIS2 come from" menu
+  - `--based-on`, `--sha256`, and "choose another release" on a checksum failure
+  - summary + confirm, `--dry-run`
+- [ ] 3b.4 `dhis2-delete-instance`: `--dry-run` (lists everything that would be removed), `--postgres`, "add -y" without a terminal, errors to stderr
+- [ ] 3b.5 `dhis2-restoredb`: `--dry-run`, `--postgres` (no longer hardcoded), "add -y" without a terminal
+- [ ] 3b.6 `dhis2-dbactivity --json`, `--postgres`
+- [ ] 3b.7 `dhis2-logview`: **security fix**. The `-g` text currently goes through a shell as root in the container.
+      Run `journalctl` with an argument list instead. Fix `-f`/`-r` (they swallow the next argument). Add `--json` (journalctl `-o json`)
+- [ ] 3b.8 `dhis2-backup`: exit non-zero when any backup fails (today it always exits 0), `--dry-run`
+- [ ] 3b.9 `dhis2-ssl-setup`:
+  - `-y`, `--renew yes|no`, `--dry-run` (certbot's `--dry-run` against the Let's Encrypt test server)
+  - **fix:** without a terminal it currently skips its "are you sure?" menu and requests the certificate
+- [ ] 3b.10 `dhis2-upgrade-setup --dry-run` (report what each step would change)
+- [ ] 3b.11 `dhis2-tools-update --check --json` → `{"current", "latest", "update_available"}`
+- [ ] 3b.12 `dhis2-glowroot-login` / `dhis2-munin-login`: `--dry-run` (which instances would change and restart)
+- [ ] 3b.13 `dhis2-tomcat-munin`: stop at the first failure and exit non-zero
+
 ## Phase 4 – Hostnames and paths
 
 - [ ] 4.1 nginx layout with one server block per hostname. Existing upstream files keep working under the fqdn
 - [ ] 4.2 Page at each hostname root that lists its instances, regenerated whenever instances change
-- [ ] 4.3 DNS check for a new subdomain: on failure, explain what to check and offer to retry
-- [ ] 4.4 Certificate per subdomain, with the auto-renewal prompt
+- [ ] 4.3 DNS check for a new subdomain: on failure, explain what to check and offer to retry (without a terminal: exit 1)
+- [ ] 4.4 Certificate per subdomain, with the auto-renewal prompt (`dhis2-ssl-setup --hostname`, `--renew yes|no`)
 - [ ] 4.5 `dhis2-create-instance` prompts:
   1. hostname (existing or new subdomain)
   2. path, validated
   3. container name [`<subdomain>-<path>`]
 
-  Flags: `-H`, `-p`
+  Flags: `-H <hostname>`, `-p <path>` (both required with `-y`; name defaults to `<subdomain>-<path>`)
 - [ ] 4.6 Quote instance names in all SQL, since names can contain `-`
-- [ ] 4.7 `dhis2-delete-instance`: remove the instance from its hostname. If it was the last one there, offer to remove the subdomain (never the fqdn)
-- [ ] 4.8 `dhis2-move-instance <name> <hostname> [path]`
+- [ ] 4.7 `dhis2-delete-instance` (`--remove-hostname yes|no` for automation): remove the instance from its hostname. If it was the last one there, offer to remove the subdomain (never the fqdn)
+- [ ] 4.8 `dhis2-move-instance <name> -H <hostname> [-p <path>]`: summary, `-y`, `--dry-run`
 - [ ] 4.9 Glowroot at `/<path>-glowroot`
 
 ## Phase 5 – Interactive setup and instance creation
 
 - [ ] 5.1 Setup wizard `setup.sh`: asks FQDN, email, TZ, monitoring, Glowroot defaults and login mode, backups, then writes `containers.json`
+- [ ] 5.1b `setup.sh --dry-run`: check the config and print what would be set up
 - [ ] 5.1a `setup.sh --config <file|->`: the same install with no prompts, for Ansible and the Nuxt app.
       Secrets are accepted in the input and stripped before saving. Update `containers.json.sample` to the full format
 - [ ] 5.2 Service scripts prompt for missing arguments when run in a terminal:
@@ -171,7 +208,9 @@ Requirements agreed with the user on 2026-09-26.
   - If both are left as defaults, change nothing, but print a warning that the default login is publicly known.
   - If either differs, wait until DHIS2 is up and change it through the API.
   - Skip this step when the instance was restored from a backup.
-- [ ] 5.4 Memory for the instance (Java heap + container limit), default based on free RAM
+- [ ] 5.4 Memory for the instance (Java heap + container limit), default based on free RAM (`--memory <size>`)
+- Automation: the admin login is a second secret next to the Glowroot password, so `dhis2-create-instance` takes both with
+  `--secrets-stdin` (`glowroot_password`, `admin_password`); `--admin-user`
 
 ## Phase 6 – Backups
 
@@ -183,7 +222,7 @@ Requirements agreed with the user on 2026-09-26.
   - backup directory
   - optional remote rsync target
 - [ ] 6.2 `dhis2-backup`: delete old monthly backups, use each database's own container, quote names
-- [ ] 6.3 `dhis2-create-instance`: "Back up this instance? [Y/n]" adds it to `PLAIN_BACKUPS`. `dhis2-delete-instance` removes it
+- [ ] 6.3 `dhis2-create-instance` (`--backup yes|no`): "Back up this instance? [Y/n]" adds it to `PLAIN_BACKUPS`. `dhis2-delete-instance` removes it
 - [ ] 6.4 New layout: group by instance, then by date. Each run is one folder holding the database and the file store:
   ```
   /var/pgbackups/
@@ -229,6 +268,15 @@ Requirements agreed with the user on 2026-09-26.
   - A failed remote doesn't stop the others.
   - Results are logged to `/var/log/dhis2-backup.log` and shown by `list`.
 - [ ] 6.11 Setup wizard asks "Add a remote backup location now? [y/N]" and runs `add`.
+- [ ] 6.13 `dhis2-list-backups [instance] [--json]` (new): instance, date, type, size, files archive yes/no, encrypted yes/no.
+      The Nuxt app's backup screen and the restore menu (7.1) use it
+- [ ] 6.14 `dhis2-backup --json`: per instance, whether the database and the file store succeeded, and where they were written
+- Automation of `dhis2-backup-remote`:
+  - `add` takes `--name --type ssh|cloud --host --user --path --mode keep|mirror`
+  - `list --json`; `test` sets the exit code; `sync --dry-run` (rsync `-n` / rclone `--dry-run`); `remove -y`
+  - SSH key install needs the remote password (`ssh-copy-id`), so without a terminal: `--install-key no` prints the public key
+    for the caller to add on the remote
+  - cloud credentials via `--secrets-stdin`
 - [ ] 6.12 Later: alert on failure (e.g. email to the address in `containers.json`). No `fetch` from remotes (user decision).
 
 Example:
@@ -251,7 +299,9 @@ Testing: connect ✓  write ✓  delete test file ✓
   - Check that the file exists and is valid gzip.
   - Ask "Which DHIS2 version is this backup from?" using the version menu.
   - Backups older than 2.38 are refused with an explanation.
-- [ ] 7.2 Restore into the new database **before** DHIS2 first starts, deploying the war for that version (reuses `dhis2-restoredb -y`)
+- [ ] 7.2 Deploy that release as usual, then stop tomcat, restore the backup (`dhis2-restoredb -y`), and start it again
+      (agreed 2026-09-26: no "create without deploying" needed for this)
+- Automation: `--restore <file>`, `--restore-files yes|no`, `--backup-password-file <path>` for encrypted backups
 - [ ] 7.3 Skip the admin login step (5.3), since the backup brings its own users
 - [ ] 7.4 Accept encrypted backups (`.sql.gz.enc`): ask for the password file [`PASSWORD_FILE` from `dhis2-env`]. `dhis2-restoredb` gets the same support
 - [ ] 7.5 If a matching `<name>.files.tar.gz[.enc]` sits next to the database backup, offer to restore it into `/opt/dhis2/files` (owned by tomcat)
@@ -286,7 +336,7 @@ Testing: connect ✓  write ✓  delete test file ✓
   - follow database migrations in the log, and check health after start
   - app compatibility and analytics tables
   - downtime warning and confirmation
-- [ ] 9.2 Build `dhis2-upgrade-instance`
+- [ ] 9.2 Build `dhis2-upgrade-instance`: `-V <release>`, summary, `-y`, `--dry-run`, backup first (default yes)
 
 ## Phase 10 – Docs and polish
 
@@ -295,7 +345,7 @@ Testing: connect ✓  write ✓  delete test file ✓
 
 ## Later
 
-- [ ] Turn Glowroot or Munin on or off for an existing instance (e.g. `dhis2-glowroot enable <instance>`)
+- [ ] Turn Glowroot or Munin on or off for an existing instance (e.g. `dhis2-glowroot enable <instance>`): `-y` (restart), `--dry-run`
 - [ ] Alerts when a remote backup fails (6.12)
 - [ ] `setup.sh --answers` replay of a previous wizard run
 
