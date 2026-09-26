@@ -20,10 +20,6 @@ PROXY=$(jq -r .proxy $CONF)
 PROXY_IP=$(jq -r '.containers[] | select(.name=="proxy") | .ip' $CONF)
 MONITORING=$(jq -r .monitoring $CONF)
 GLOWROOT_LOGIN=$(jq -r '.glowroot_login // "own"' $CONF)
-JAVA_VERSION="11"
-
-# instances run tomcat9, which Ubuntu ships up to 22.04 (phase 3 adds 24.04 + tomcat10 for DHIS2 2.42+)
-GUESTOS=22.04
 
 ###############################################################
 usage() {
@@ -34,7 +30,7 @@ usage() {
   echo "Options:"
   echo "  -h, --help        Display this help message"
   echo "  -n                Do NOT create database for instance"
-  echo "  -j <8|11|17>      Java version. Default is 11"
+  echo "  -V <release>      DHIS2 release, exact name from the list (e.g. 2.42.6); asked on a terminal"
   echo "  -g <yes|no>       Install Glowroot (default from containers.json \"apm\", asked on a terminal)"
   echo "  -m <yes|no>       Monitor with Munin (only when Munin is installed; default yes)"
   echo "  -U <username>     Glowroot username (default admin)"
@@ -45,13 +41,13 @@ usage() {
 GLOWROOT=""
 MUNIN=""
 GR_USER_OPT=""
+V_OPT=""
 PASSWORD_STDIN=false
 ARGS=()
 while [[ $# -gt 0 ]]; do
   case $1 in
     -n) CREATEDB=false ;;
-    -j) JAVA_VERSION=$2; shift
-        [[ $JAVA_VERSION =~ ^(8|11|17)$ ]] || usage ;;
+    -V) V_OPT=$2; shift ;;
     -g) GLOWROOT=$2; shift
         [[ $GLOWROOT =~ ^(yes|no)$ ]] || usage ;;
     -m) MUNIN=$2; shift
@@ -129,6 +125,21 @@ if [[ $GLOWROOT == yes ]]; then
   fi
 fi
 
+# DHIS2 release: it decides the container OS, tomcat and java.
+# The war is downloaded and checked before anything is created.
+feed_load
+ask_release RELEASE "" "" "$V_OPT"
+TOMCAT=$(tomcat_for_line "$REL_LINE")
+GUESTOS=$(guestos_for_tomcat "$TOMCAT")
+JAVA_VERSION=$REL_JDK
+if [[ $TOMCAT == tomcat10 ]] && ! grep -q TOMCAT $TOMCAT_SETUP; then
+  die "$TOMCAT_SETUP is from an older version: run sudo dhis2-upgrade-setup first"
+fi
+WARDIR=$(mktemp -d -p /var/tmp dhis2-war.XXXXXX)
+trap 'rm -rf "$WARDIR"' EXIT
+download_war "$WARDIR" || die "could not get a verified download of DHIS2 $RELEASE; nothing was created"
+echo "$NAME: DHIS2 $RELEASE on $TOMCAT, Java $JAVA_VERSION, Ubuntu $GUESTOS"
+
 if [[ $CREATEDB == true ]]
 then
 
@@ -195,6 +206,8 @@ sudo lxc config device set $NAME eth0 ipv4.address $IP
 
 # lxc config set $NAME boot.autostart false
 lxc config set $NAME user.type "Tomcat server"
+lxc config set $NAME user.dhis2.tomcat $TOMCAT
+lxc config set $NAME user.dhis2.java $JAVA_VERSION
 lxc start $NAME 
 
 # wait for network to come up
@@ -203,10 +216,9 @@ until lxc exec $NAME -- getent hosts archive.ubuntu.com >/dev/null; do
 done
 
 # Added PROXY_IP to tomcat_setup
-sed "s/PROXY_IP/${PROXY_IP}/" $TOMCAT_SETUP > /tmp/tomcat_setup
-sed -i "s/JAVA_VERSION/${JAVA_VERSION}/" /tmp/tomcat_setup
-cat /tmp/tomcat_setup | lxc exec $NAME -- bash
-rm /tmp/tomcat_setup
+sed -e "s/PROXY_IP/${PROXY_IP}/" -e "s/JAVA_VERSION/${JAVA_VERSION}/" -e "s/TOMCAT/${TOMCAT}/g" \
+    $TOMCAT_SETUP > $WARDIR/tomcat_setup
+lxc exec $NAME -- bash < $WARDIR/tomcat_setup
 
 if [[ $CREATEDB == true ]]
 then	
@@ -215,15 +227,15 @@ then
   lxc exec $NAME -- sed -i "s/^connection.url.*$/connection.url = jdbc:postgresql:\/\/$PG\/$NAME/" /opt/dhis2/dhis.conf
 fi
 
-# render /etc/default/tomcat9 for this java version and cpu architecture
+# render /etc/default/<tomcat> for this java version and cpu architecture
 # ({{ JAVA_VERSION }} is the placeholder in tomcat_default files from older installs)
 JAVA_ARCH=$(lxc exec $NAME -- dpkg --print-architecture)
 sed -e "s/{{ JAVA_VERSION }}/${JAVA_VERSION}/" -e "s/JAVA_VERSION/${JAVA_VERSION}/" \
-    -e "s/JAVA_ARCH/${JAVA_ARCH}/" /usr/local/etc/dhis/tomcat_default > /tmp/tomcat9
+    -e "s/JAVA_ARCH/${JAVA_ARCH}/" /usr/local/etc/dhis/tomcat_default > $WARDIR/tomcat_default
 
 if [[ $GLOWROOT == yes ]]
 then
-  sed -ri '/glowroot.jar/ s/..(.*)/\1/' /tmp/tomcat9
+  sed -ri '/glowroot.jar/ s/..(.*)/\1/' $WARDIR/tomcat_default
 
   GLOWROOT_ZIP=glowroot-$GLOWROOT_VERSION-dist.zip
   lxc exec $NAME -- wget -q -P /opt https://github.com/glowroot/glowroot/releases/download/v$GLOWROOT_VERSION/$GLOWROOT_ZIP
@@ -235,17 +247,18 @@ then
 else
   lxc config set $NAME user.dhis2.glowroot off
 fi
-lxc file push /tmp/tomcat9 $NAME/etc/default/tomcat9
-rm /tmp/tomcat9
-lxc exec $NAME -- chmod 644 /etc/default/tomcat9
+lxc file push $WARDIR/tomcat_default $NAME/etc/default/$TOMCAT
+lxc exec $NAME -- chmod 644 /etc/default/$TOMCAT
 lxc exec $NAME -- systemctl daemon-reload
 lxc exec $NAME -- service rsyslog restart
-# before the restart below, so tomcat picks up the monitoring user
+# before tomcat starts below, so it picks up the monitoring user
 if [[ $MUNIN == yes ]]; then
   "$(dirname "$(readlink -f "$0")")/dhis2-tomcat-munin" $NAME
 fi
 lxc config set $NAME user.dhis2.munin $MUNIN
-lxc exec $NAME -- service tomcat9 restart
+
+# deploy the checked war and start tomcat
+deploy_war $NAME "$WARDIR/dhis.war" "$RELEASE"
 
 # Append to bottom /etc/hosts
 sudo sed -i "/$IP/d" /etc/hosts
@@ -353,3 +366,5 @@ else
   echo "Error: Proxy type not supported"
   exit 1
 fi
+
+echo "$NAME: DHIS2 $RELEASE is starting at $(server_base_url)/$NAME (the first start takes a few minutes)"

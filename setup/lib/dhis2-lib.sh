@@ -236,3 +236,10 @@ deploy_war() {
   lxc config set "$name" user.dhis2.version "$release"
   lxc exec "$name" -- service "$t" start
 }
+
+# server_base_url: https://<fqdn> once the proxy has a certificate, http://<fqdn> before that
+server_base_url() {
+  local fqdn
+  fqdn=$(jq -r .fqdn /usr/local/etc/dhis/containers.json)
+  if lxc exec proxy -- test -d "/etc/letsencrypt/live/$fqdn" 2>/dev/null; then echo "https://$fqdn"; else echo "http://$fqdn"; fi
+}
