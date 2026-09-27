@@ -452,6 +452,12 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
   - `dhis2-tools-update --check` shows the installed version and channel, the newest available, and the release notes of every
     release in between (from GitHub Releases); `--check --json` gives the same as `installed`, `channel`, `latest`,
     `update_available`, `major`, `releases: [{version, date, notes}]`.
+- **Branches** (R5, partly agreed):
+  - `master` holds **released code only**: it moves only when a release is made (with the user's yes), so it always equals the
+    newest release.
+  - Work moves from the single `develop` branch to **a branch per upcoming version** (naming and switch-over: being settled).
+  - Urgent fixes to a released version: a short-lived `hotfix/<x.y.z>` branch from that release's tag; the fix is released from
+    it and merged back into the work branch.
 
 ## 13. Management app and automation
 
