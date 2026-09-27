@@ -360,6 +360,19 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
   - Built into the shared helpers (`die`, `check_missing`, `summary`, `confirm_summary`); each command adds its `result`.
   - When: commands reworked in phase 4 get it there; the rest in a short phase 3c (deploy-war, restoredb, the login commands,
     upgrade-setup, backup).
+- **Live results** (agreed 2026-09-27, built in phase 3c, on **every** command; phase 4 commands use the same helpers):
+  1. `--json-stream`: one JSON object per line (JSON Lines) on stdout while the command runs: `start` (with the run id),
+     `step` (started/done, message), `progress` (percent, e.g. downloads), and a last line `{"type": "result", …}` that is the
+     same object `--json` gives (ok/result or ok/error). Plain `--json` stays: one object at the end.
+  2. Every run also writes its lines to `/var/log/dhis2-tools/runs/<run-id>.jsonl`; the run id is printed first. A caller
+     whose connection dropped reads on from the file; past runs stay as a record.
+  3. `--detach`: the command starts itself as a background job (a systemd service unit, so it survives the SSH session
+     ending), prints its run id and returns at once. New command `dhis2-run`: `follow <id>` (stream the lines, resumable),
+     `status <id> [--json]` (running / succeeded / failed + the final result), `list` (recent runs).
+  - Nuxt: start with `--detach`, show progress with `dhis2-run follow`, reconnect the same way. Ansible: start with
+    `--detach`, poll `dhis2-run status <id> --json`.
+  - Built into the shared helpers: `step` / `progress` calls replace the progress messages commands print today, so human
+    output and the stream come from the same place.
 - Errors go to stderr through `die` (`setup/lib/dhis2-lib.sh`).
 - `-h`/`--help` lists every flag with its default, and exits 0.
 
@@ -415,6 +428,7 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
   phase 3c for the rest.
+- 2026-09-27: live results on every command: `--json-stream` (JSON Lines), run log files, `--detach` + `dhis2-run`; built in 3c.
 - 2026-09-27 (phase 4 B): paths `[a-z0-9-]`, 1–40 characters; each hostname's root is a list page or a redirect to a chosen
   instance, asked when an instance is created on it; container names = a short name per hostname (default its first part) +
   the path. Corrected the same day: the short name is asked when the hostname is created, not at its first instance.

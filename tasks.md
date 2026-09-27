@@ -216,7 +216,13 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
       produce the error and dry-run objects; a `json_result` helper for success
 - [ ] 3c.2 `--json` on `dhis2-deploy-war`, `dhis2-restoredb`, `dhis2-glowroot-login`, `dhis2-munin-login`, `dhis2-upgrade-setup`,
       `dhis2-backup`, `dhis2-dbactivity`/`dhis2-logview` (already JSON: check they fit), `dhis2-tools-update`
-- Phase 4 adds `--json` to the commands it reworks (create/delete/move instance, `dhis2-hostname`, `dhis2-ssl-setup`)
+- [ ] 3c.3 Live results in the shared helpers (`architecture.md` section 12): `step` / `progress` events; `--json-stream`
+      (JSON Lines, last line = the `--json` object); every run logged to `/var/log/dhis2-tools/runs/<run-id>.jsonl`
+- [ ] 3c.4 `--detach` (the command re-runs itself as a systemd service unit, prints the run id, returns) and the new `dhis2-run`
+      command: `follow <id>`, `status <id> [--json]`, `list`
+- [ ] 3c.5 Every existing command: its progress messages become `step`/`progress` calls; `--json-stream` and `--detach` work on all
+- Phase 4 adds `--json` to the commands it reworks (create/delete/move instance, `dhis2-hostname`, `dhis2-ssl-setup`); they use the
+  3c helpers, so `--json-stream`/`--detach` come with them
 
 ## Phase 4 – Hostnames and paths
 
