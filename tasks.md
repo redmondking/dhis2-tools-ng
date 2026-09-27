@@ -230,7 +230,8 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] 4.5 `dhis2-create-instance` prompts:
   1. hostname (existing or new subdomain)
   2. path, validated
-  3. short name for a new hostname [its first part], asked once per hostname
+  3. for a new hostname: the hostname-creation steps (short name [its first part], certificate email), the same as
+     `dhis2-hostname add`
   4. container name [`<short name>-<path>`]
   5. what the hostname's root shows (first instance: this instance or a list; later: keep, this instance, or a list)
 

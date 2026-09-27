@@ -200,8 +200,9 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
       instead 3) Show a list" (default: keep)
   - Automation: `--root this|list|keep`; without it: `this` for the first instance on a hostname, `keep` after that.
 - Container names (agreed 2026-09-27, phase 4 section B): **a short name per hostname + the path**, e.g. `moh-prod`, `ngo-test`.
-  - The short name is asked once, when the first instance is created on a new hostname: "Short name for it, used in instance
-    names [<first part of the hostname>]". It must be unique on the server, so instance names can't clash.
+  - The short name is asked once, **when the hostname is created** (`dhis2-hostname add`, or "a new hostname" while creating an
+    instance, which runs the same steps): "Short name for it, used in instance names [<first part of the hostname>]".
+    It must be unique on the server, so instance names can't clash.
   - The suggested container name is `<short name>-<path>`; the user can type another (`--name` for automation).
   - Existing servers: `default_hostname` gets a short name (its first part); existing instances keep their names.
 - Deleting the last instance on a subdomain asks whether to remove the subdomain's proxy config and certificate
@@ -390,7 +391,7 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27 (phase 4 B): paths `[a-z0-9-]`, 1–40 characters; each hostname's root is a list page or a redirect to a chosen
   instance, asked when an instance is created on it; container names = a short name per hostname (default its first part) +
-  the path.
+  the path. Corrected the same day: the short name is asked when the hostname is created, not at its first instance.
 - 2026-09-27 (phase 4 A): `fqdn` renamed `default_hostname`; any hostname whose DNS points here is allowed (no base domains;
   replaces "subdomains of the fqdn only"); a certificate email per hostname, defaulting to the server's email.
 - 2026-09-27 (phase 4 A): Munin's address is a setting (`munin_hostname`, default the `fqdn`), not tied to the main domain.
