@@ -7,7 +7,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 ## Versions
 
-Each version is a release branch `release/<version>` (`architecture.md` section 12a). A version is released once its phases are
+Each version is a release branch `release/<version>` (`architecture.md`, Versions and releases). A version is released once its phases are
 tested on the test server and approved. `(proposed)` = waiting for the user's confirmation.
 
 | Version | Phases and tasks | State |
@@ -27,7 +27,7 @@ tested on the test server and approved. `(proposed)` = waiting for the user's co
 
 - Branch `release/0.1.0` (renamed from `develop` on 2026-09-27), nothing pushed. `master` is still the original code (`a37e7db`).
 - Phases 0, 2, 3 and 3b are written and committed. Nothing has been tested on a real server yet: all `[~]`.
-- Command and flag rules agreed (`architecture.md` section 12). Every command was audited; the results are phase 3b
+- Command and flag rules agreed (`architecture.md`, Command rules). Every command was audited; the results are phase 3b
   (existing commands) and the automation notes in phases 4–9 (new commands).
 - 2026-09-26: the design moved from `CLAUDE.md` into `architecture.md`, restoring sections accidentally deleted in commit `356d186`.
 - Phase 3b is done (all `[~]`), including 3b.17 (certbot webroot for nginx, config test with rollback).
@@ -108,7 +108,7 @@ tested on the test server and approved. `(proposed)` = waiting for the user's co
       server with a standalone certificate (original scripts): the challenge is added, the certificate moves to webroot and its
       test renewal passes; on a failing test renewal the old renewal config is put back
     - `dhis2-logview`: `-f`, `-r`, `-g` with quotes and `;` in the text (must only search), `-S`/`-U`, `-n`, `--json` on Tomcat 9 and 10
-- [ ] 1.4 Release `0.1.0`: tag, fast-forward `master`, push (`architecture.md` section 12a)
+- [ ] 1.4 Release `0.1.0`: tag, fast-forward `master`, push (`architecture.md`, Versions and releases)
 
 ## Phase 2 – Install/update, lock down monitoring, modernise the base  ·  version 0.1.0
 
@@ -181,10 +181,10 @@ Requirements agreed with the user on 2026-09-26.
 
 ## Phase 3b – Existing commands follow the command and flag rules  ·  version 0.1.0
 
-Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-09-26. New commands follow the rules when they are built (flags listed in their phase below).
+Rules: `architecture.md`, Command rules. Audit done 2026-09-26. New commands follow the rules when they are built (flags listed in their phase below).
 
 - [~] 3b.1 Shared helpers: `need_flags` (collect every missing flag, then one error with exit 3), a summary/confirm helper,
-      `--secrets-stdin` reader (JSON object on stdin, keys like `glowroot_password`; see `architecture.md` section 12), and "no terminal: add -y" (exit 3)
+      `--secrets-stdin` reader (JSON object on stdin, keys like `glowroot_password`; see `architecture.md`, Command rules), and "no terminal: add -y" (exit 3)
 - [~] 3b.2 `dhis2-create-instance` (also 3b.15 and 3b.16 for this command):
   - first question: 1) create and deploy DHIS2 2) create only (`--no-deploy`); create only asks the version line (`--line 2.42`)
     to choose Ubuntu/Tomcat/Java
@@ -194,10 +194,10 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
     - label `user.dhis2.source` = `official` or `custom`
   - checksum failure menu: 1) try again 2) choose another release 3) stop
   - summary + "Create it?"
-  - `-y` (all required flags, see `architecture.md` section 12; defaults: IP, postgres, Glowroot user `admin`, deploy)
+  - `-y` (all required flags, see `architecture.md`, Command rules; defaults: IP, postgres, Glowroot user `admin`, deploy)
   - `--dry-run`
   - `--ip`, `--postgres` as named flags; the positional forms keep working
-  - two possible secrets (Glowroot password, and the DHIS2 admin password from 5.3): see the secrets rule in `architecture.md` section 12
+  - two possible secrets (Glowroot password, and the DHIS2 admin password from 5.3): see the secrets rule in `architecture.md`, Command rules
 - [~] 3b.3 `dhis2-deploy-war` (also 3b.16 for this command):
   - the same "where does DHIS2 come from" menu
   - `--based-on`, `--sha256`, and "choose another release" on a checksum failure
@@ -222,13 +222,13 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [~] 3b.17 (found in 3b.9) `dhis2-ssl-setup`: stop when certbot fails. Today it carries on and switches nginx to a certificate
       that doesn't exist, which breaks the proxy. Agreed fix (2026-09-27): certbot **webroot** (the proxy never stops), https config
       only after the certificate exists, config test with rollback, and a `dhis2-upgrade-setup` step moving existing certificates
-      from standalone to webroot (`architecture.md` section 4)
+      from standalone to webroot (`architecture.md`, Hostnames and certificates)
 - [~] 3b.16 Every short flag also gets a long name, both in `-h` (`-V`/`--release`, `-g`/`--glowroot`, `-m`/`--munin`, ...)
 - Order (agreed): 3b.1 helpers → 3b.2 create-instance, 3b.3 deploy-war → security fixes 3b.7 logview, 3b.9 ssl-setup → the rest.
 - [~] 3b.15 `--password-stdin` → `--secrets-stdin` in `dhis2-create-instance`, `dhis2-glowroot-login`, `dhis2-munin-login`;
       `-U` → `--glowroot-user` / `--munin-user` (keep `-U` as a short form)
 
-## Releases (agreed 2026-09-27, `architecture.md` section 12a)  ·  V.1, V.5: 0.1.0; V.2–V.4: 0.2.0
+## Releases (agreed 2026-09-27, `architecture.md`, Versions and releases)  ·  V.1, V.5: 0.1.0; V.2–V.4: 0.2.0
 
 - [ ] V.1 `VERSION` at the repo root, `CHANGELOG.md` (with the work so far under "Unreleased", grouped Added / Changed / Fixed /
       Security / Upgrade notes), `RELEASING.md`, `tools/release.sh`
@@ -246,11 +246,11 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 
 ## Phase 3c – JSON answers from the commands phase 4 doesn't rework  ·  version 0.2.0
 
-- [ ] 3c.1 `--json` answers (`architecture.md` section 12) in the shared helpers: `die` / `check_missing` / `confirm_summary`
+- [ ] 3c.1 `--json` answers (`architecture.md`, Command rules) in the shared helpers: `die` / `check_missing` / `confirm_summary`
       produce the error and dry-run objects; a `json_result` helper for success
 - [ ] 3c.2 `--json` on `dhis2-deploy-war`, `dhis2-restoredb`, `dhis2-glowroot-login`, `dhis2-munin-login`, `dhis2-upgrade-setup`,
       `dhis2-backup`, `dhis2-dbactivity`/`dhis2-logview` (already JSON: check they fit), `dhis2-tools-update`
-- [ ] 3c.3 Live results in the shared helpers (`architecture.md` section 12): `step` / `progress` events; `--json-stream`
+- [ ] 3c.3 Live results in the shared helpers (`architecture.md`, Command rules): `step` / `progress` events; `--json-stream`
       (JSON Lines, last line = the `--json` object); every run logged to `/var/log/dhis2-tools/runs/<run-id>.jsonl`
 - [ ] 3c.4 `--detach` (the command re-runs itself as a systemd service unit, prints the run id, returns) and the new `dhis2-run`
       command: `follow <id>`, `status <id> [--json]`, `list`
@@ -261,16 +261,16 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 ## Phase 4 – Hostnames and paths  ·  version 0.3.0
 
 - Section A (domains) discussed 2026-09-27: any hostname whose DNS points here (no base domains); `fqdn` → `default_hostname`;
-  Munin's hostname a setting; a certificate email per hostname (`architecture.md` section 7). Sections B–G still to discuss.
+  Munin's hostname a setting; a certificate email per hostname (`architecture.md`, Instances / Hostnames and certificates). Sections B–G still to discuss.
 
 - [ ] 4.1 nginx layout with one server block per hostname. Existing upstream files keep working under the fqdn
-- [ ] 4.2 Each hostname's root: a list page of its instances (regenerated whenever instances change) or a redirect to a chosen instance (`architecture.md` section 7)
+- [ ] 4.2 Each hostname's root: a list page of its instances (regenerated whenever instances change) or a redirect to a chosen instance (`architecture.md`, Instances / Hostnames and certificates)
 - [ ] 4.3 DNS check for a new hostname against `public_ip` (new setting, suggested by the wizard from an outside lookup): on failure,
       explain what to check and offer retry / `--wait-dns` / cancel (without a terminal: exit 1, `dns_not_pointing_here`)
 - [ ] 4.3a Certificate choice per hostname: Let's Encrypt (default) / own files (`--cert-file`, `--key-file`; checked, installed,
       `nginx -t`) / none (http only, warned); a failed Let's Encrypt certificate leaves the hostname "http only, certificate pending"
 - [ ] 4.4 Certificate per subdomain, with the auto-renewal prompt (`dhis2-ssl-setup --hostname`, `--renew yes|no`)
-- [ ] 4.10 Certificate failure handling (agreed 2026-09-27, `architecture.md` section 4), as shared helpers used by every hostname:
+- [ ] 4.10 Certificate failure handling (`architecture.md`, Hostnames and certificates), as shared helpers used by every hostname:
   - pre-flight checks: automatic staging test first; DNS points here; stray AAAA; CAA excluding Let's Encrypt; the proxy
     serves a test file from the challenge folder; port 80 reaches the proxy (host `ufw` + NAT)
   - plain reasons for certbot's common errors, plus the certbot log path
@@ -289,14 +289,14 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   Flags: `-H <hostname>`, `-p <path>` (both required with `-y`), `--short-name`, `--name` (default `<short name>-<path>`),
   `--root this|list|keep`, `--email` for a new hostname's certificate
 - [ ] 4.6 Quote instance names in all SQL, since names can contain `-`
-- [ ] 4.6a Automatic instance IPs: free ones in `.10`–`.19` first, then `.100`–`.249` (`architecture.md` section 7)
+- [ ] 4.6a Automatic instance IPs: free ones in `.10`–`.19` first, then `.100`–`.249` (`architecture.md`, Instances / Hostnames and certificates)
 - [ ] 4.7 `dhis2-delete-instance` (`--remove-hostname yes|no` for automation): remove the instance from its hostname. If it was the last one there, offer to remove the subdomain (never the fqdn)
 - [ ] 4.8 `dhis2-instance edit <name>`: `--hostname`, `--path`, `--description`/`--clear-description`; summary, `-y`, `--dry-run`
 - [ ] 4.9 Glowroot at `/<path>-glowroot`
-- [ ] 4.11 One `dhis2-instance` command (`architecture.md` section 7): dispatcher + `setup/service/instance/{create,delete,edit,deploy,list}`,
+- [ ] 4.11 One `dhis2-instance` command (`architecture.md`, Instances / Hostnames and certificates): dispatcher + `setup/service/instance/{create,delete,edit,deploy,list}`,
       replacing `dhis2-create-instance`, `dhis2-delete-instance`, `dhis2-deploy-war`, `dhis2-list-instances` (no links under the old names)
 - [ ] 4.12 `dhis2-upgrade-setup`: move copies of the retired command names aside on existing servers and print the new commands
-- [ ] 4.13 Regroup all commands into six (`architecture.md` section 11a): `dhis2-instance` (+ `logs`), `dhis2-hostname` (+ `cert`,
+- [ ] 4.13 Regroup all commands into six (`architecture.md`, Commands): `dhis2-instance` (+ `logs`), `dhis2-hostname` (+ `cert`,
       `certs`), `dhis2-backup` (`run`, `list`, `restore`, `remote …`), `dhis2-monitoring` (`glowroot`, `munin`), `dhis2-server`
       (`setup`, `update`, `migrate`, `db-activity`), `dhis2-run`; retire every old name on existing servers (with 4.12)
 
@@ -318,11 +318,11 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   - If either differs, wait until DHIS2 is up and change it through the API.
   - Skip this step when the instance was restored from a backup.
 - [ ] 5.4 Memory for the instance (Java heap + container limit), default based on free RAM (`--memory <size>`)
-- Automation: `--dhis2-user`; the admin password is `dhis2_password` in `--secrets-stdin` (see `architecture.md` section 12)
+- Automation: `--dhis2-user`; the admin password is `dhis2_password` in `--secrets-stdin` (see `architecture.md`, Command rules)
 
 ## Phase 6 – Backups  ·  version 0.5.0
 
-- Where `dhis2-backup` gets its information (agreed 2026-09-26, details in `architecture.md` section 10):
+- Where `dhis2-backup` gets its information (agreed 2026-09-26, details in `architecture.md`, Backups):
   `dhis2-env` = how (server-wide settings), instance labels = what (`user.dhis2.backup`, `user.dhis2.postgres`),
   remotes files = where to copy. The old `PLAIN_BACKUPS`/`ENCRYPTED_BACKUPS` lists remain only for databases without an instance.
 - [ ] 6.1 Setup wizard asks for the backup settings, each with a default. They are written to `dhis2-env` and the cron job is enabled.
@@ -390,7 +390,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   - `list --json`; `test` sets the exit code; `sync --dry-run` (rsync `-n` / rclone `--dry-run`); `remove -y`
   - SSH key install needs the remote password (`ssh-copy-id`), so without a terminal: `--install-key no` prints the public key
     for the caller to add on the remote (agreed 2026-09-26)
-  - cloud credentials as secrets (see `architecture.md` section 12)
+  - cloud credentials as secrets (see `architecture.md`, Command rules)
 - [ ] 6.12 Later: alert on failure (e.g. email to the address in `containers.json`). No `fetch` from remotes (user decision).
 
 Example:
@@ -473,4 +473,4 @@ Testing: connect ✓  write ✓  delete test file ✓
 
 ## Decisions
 
-All agreed decisions are in `architecture.md` (design sections and the decisions log, section 15).
+All agreed decisions are in `architecture.md`.

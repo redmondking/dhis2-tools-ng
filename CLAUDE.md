@@ -14,7 +14,7 @@ Operational rules for the dhis2-tools-ng fork. See `architecture.md` for the des
 *   **Target:** scripts run as root on Ubuntu 24.04 hosts, and on existing 20.04/22.04 hosts through
     `dhis2-upgrade-setup`, with `lxc`, `jq` and `ufw` available
 
-The repo layout and what runs where are in `architecture.md` sections 1, 2, 4 and 5.
+The repo layout and what runs where are in `architecture.md` (Overview, Commands, Install, update and migrate, Containers and packages).
 
 ## 3. Commands
 
@@ -31,7 +31,7 @@ Real tests are only done on the test server, never on the development machine. L
 
 *   **Tasks and phases:** A task is one numbered line in `tasks.md` (e.g. 3.1). A phase is a group of tasks (e.g. phase 3).
 *   **Branches:** Work on the branch of the version being built, `release/<version>` (now `release/0.1.0`). `master` holds
-    released code only, and stays at the original code (`a37e7db`) until `0.1.0` is released. See `architecture.md` section 12a.
+    released code only, and stays at the original code (`a37e7db`) until `0.1.0` is released. See `architecture.md`, Versions and releases.
 *   **Merging:** Move `master` to a release (fast-forward from the release branch) only after asking the user and getting a yes in chat. Pushing any branch,
     force-pushing and rebasing are left to the user.
 
@@ -90,7 +90,7 @@ Real tests are only done on the test server, never on the development machine. L
     never assume the host's tools.
 *   **Idempotent:** Every script is safe to run twice. Append config only when its marker line is not already there.
 *   **Existing servers:** Any change to installed state or to an `etc/*` template ships with a matching
-    `dhis2-upgrade-setup` step that patches only known lines (`architecture.md` section 14).
+    `dhis2-upgrade-setup` step (`dhis2-server migrate` from 0.3.0) that patches only known lines (`architecture.md`, Install, update and migrate).
 *   **No shell strings:** User input never reaches a shell string. Run commands in containers with an argument list,
     never `lxc exec "$NAME" -- bash -c "$input"`.
 
