@@ -143,12 +143,12 @@ safe to run twice. The shared helpers are in `setup/lib/dhis2-lib.sh`.
     default page, or an admin's own page in `/var/www/html`, is not kept.
   - The proxy config is rebuilt from the settings. The old config is saved in `/usr/local/etc/dhis/old-proxy/<date>/`, and the
     lines the tools didn't write are listed, to be moved into the hostname's `extra.conf` (section 8).
-- Renaming instances `[0.3.0; apache 0.4.0]` to the names a fresh server gives them (section 7): DHIS2 is down a few minutes
-  per instance, so it is its own question (`--rename-instances yes|no`). An unattended migrate without it skips the step, lists
-  the instances and prints `sudo dhis2-server migrate --rename-instances yes`.
-  - One instance at a time, named as on create (asked, default `<short name>-<old name>`; `-y` takes the default), with the
-    steps of a move (section 7). Its database (from `dhis.conf`) gets the new name whatever it was called; one shared with
-    another instance, or on another server, is left and reported.
+- Renaming instances `[0.3.0; apache 0.4.0]`: instances whose name doesn't start with their hostname's short name (`prod`, not
+  `hivtracker-prod`) are renamed as on create (section 7). DHIS2 is down a few minutes per instance, so it is its own question
+  (`--rename-instances yes|no`; the name part asked per instance, default the path; `-y` takes the default).
+  - Skipped: migrate prints one line per instance to run later (`sudo dhis2-instance edit prod --name prod` → `hivtracker-prod`),
+    and `dhis2-instance list` marks them until renamed.
+  - One instance at a time, as a rename in section 7.
   - Listed at the end, not changed: Munin's graph history (starts again under the new name), the admin's own cron jobs or
     scripts using old names, remote backup folders (new backups go under the new name).
 
@@ -214,11 +214,12 @@ safe to run twice. The shared helpers are in `setup/lib/dhis2-lib.sh`.
 | `user.dhis2.backup`, `user.dhis2.postgres` `[0.5.0]` | `plain` / `encrypted` / `no`; its postgres container |
 
 `migrate` labels instances made by older tools (version from the deployed war). `dhis2-instance list` shows name, version,
-address, Tomcat, Java, IP, status, Glowroot, Munin (`--json`).
+address, Tomcat, Java, IP, status, Glowroot, Munin (`--json`), and marks names that don't follow the rule below.
 
 **Names and addresses** `[0.3.0]`
 - The container name is also the database name and database user; all SQL quotes it (`"hmis-prod"`).
-- Suggested name: `<short name of the hostname>-<path>`, e.g. `moh-prod`; `--name` to choose another.
+- The name is always `<short name of its hostname>-<part>`; the part is the path unless `--name` gives another (same rules
+  as a path): `moh-prod`, or `moh-live` with `--name live`. At most 61 characters (LXD and PostgreSQL allow 63).
 - Automatic IPs: free ones in `.10`–`.19` first, then `.100`–`.249` (proxy `.2`, postgres `.20`, Munin `.30`); `--ip`.
 
 **`dhis2-instance create`**, in order: hostname (menu of existing ones with their paths and certificate status, or a new one:
@@ -240,9 +241,14 @@ default** (`--remove-hostname yes|no` required without a terminal); never for `d
 
 **`dhis2-instance edit`** `[0.3.0]`: `--hostname`, `--path`, `--description` / `--clear-description`; `--glowroot`, `--munin`
 later.
-- Moving (hostname and/or path) **renames** the instance to `<short name>-<path>` (asked, `--name`): container, database and user
-  (with a new random database password written to `dhis.conf`), `pg_hba.conf` line, labels, hosts line, Munin node and backup
-  folder. DHIS2 is down for a few minutes; a failed step undoes the earlier ones.
+- **Renaming**: `--name <part>` alone renames to `<short name>-<part>`; moving (hostname and/or path) always renames (part
+  asked, default the new path). Renamed: container, database and user (with a new random database password written to
+  `dhis.conf`), `pg_hba.conf` line, labels, hosts line, Munin node and backup folder. DHIS2 is down for a few minutes; a failed
+  step undoes the earlier ones; a running instance is started again, a stopped one stays stopped.
+  - Checked first, all in the summary: the new name is free (container, database, database user, hosts line); the database
+    and user are read from `dhis.conf` and get the new name whatever they were called (one shared with another instance, or
+    outside this server's postgres containers, is left and reported); other connections to the database are listed and
+    ended once Tomcat stops.
 - Both hostnames' roots are handled as on create and delete.
 - The old address: asked each move, explaining what it means in practice (browsers and bookmarks keep working; the DHIS2
   Android app and integrations must be reconfigured either way; the old path stays taken). **No**: the old path is removed.
@@ -265,7 +271,8 @@ through the API once DHIS2 is up. Keeping the defaults prints a warning. Skipped
   or ending with `-`; unique per hostname; never `/` itself. Reserved: `/munin` on Munin's hostname, `/<path>-glowroot` of each
   instance. Tomcat serves DHIS2 at the same path (`webapps/<path>`), so the proxy never rewrites paths.
 - Existing servers are brought into this layout by `migrate` (section 4).
-- Each hostname has a **short name** (asked when the hostname is created, default its first part, unique on the server).
+- Each hostname has a **short name** (asked when the hostname is created, default its first part, unique on the server;
+  lowercase letters, digits and `-`, 1–20 characters).
 - **The root** (`https://<hostname>/`) shows a list page or redirects (302) to one of its instances:
   - asked when an instance is created on it (first instance: "this instance or a list", default this; later: "keep, this
     instance, or a list", default keep; `--root this|list|keep`)

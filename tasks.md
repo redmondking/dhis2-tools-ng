@@ -286,15 +286,16 @@ Rules: `architecture.md`, Command rules. Audit done 2026-09-26. New commands fol
   2. path, validated
   3. for a new hostname: the hostname-creation steps (short name [its first part], certificate email), the same as
      `dhis2-hostname add`
-  4. container name [`<short name>-<path>`]
+  4. name part [the path]; the name is `<short name>-<part>`
   5. what the hostname's root shows (first instance: this instance or a list; later: keep, this instance, or a list)
 
-  Flags: `-H <hostname>`, `-p <path>` (both required with `-y`), `--short-name`, `--name` (default `<short name>-<path>`),
+  Flags: `-H <hostname>`, `-p <path>` (both required with `-y`), `--short-name`, `--name <part>` (default the path),
   `--root this|list|keep`, `--email` for a new hostname's certificate
 - [ ] 4.6 Quote instance names in all SQL, since names can contain `-`
 - [ ] 4.6a Automatic instance IPs: free ones in `.10`–`.19` first, then `.100`–`.249` (`architecture.md`, Instances / Hostnames and certificates)
 - [ ] 4.7 `dhis2-delete-instance` (`--remove-hostname yes|no` for automation): remove the instance from its hostname. If it was the last one there, offer to remove the subdomain (never the fqdn)
-- [ ] 4.8 `dhis2-instance edit <name>`: `--hostname`, `--path`, `--description`/`--clear-description`; summary, `-y`, `--dry-run`
+- [ ] 4.8 `dhis2-instance edit <name>`: `--hostname`, `--path`, `--name <part>` (rename to `<short name>-<part>`),
+      `--description`/`--clear-description`; the checks before a rename; summary, `-y`, `--dry-run`
 - [ ] 4.9 Glowroot at `/<path>-glowroot`
 - [ ] 4.11 One `dhis2-instance` command (`architecture.md`, Instances / Hostnames and certificates): dispatcher + `setup/service/instance/{create,delete,edit,deploy,list}`,
       replacing `dhis2-create-instance`, `dhis2-delete-instance`, `dhis2-deploy-war`, `dhis2-list-instances` (no links under the old names)
@@ -306,8 +307,9 @@ Rules: `architecture.md`, Command rules. Audit done 2026-09-26. New commands fol
       `default_hostname` + short name, `munin_hostname`, `public_ip` (`--public-ip` required without a terminal), labels,
       certificate → hostname setting, root question, proxy config rebuilt with the old one saved in `old-proxy/<date>/` and
       unknown lines listed
-- [ ] 4.15 `migrate --rename-instances yes|no`: instances renamed one at a time to fresh-server names, with the move steps
-      (database renamed to match, shared or remote databases left and reported); things left with old names listed
+- [ ] 4.15 `migrate --rename-instances yes|no`: instances whose name lacks their hostname's short name renamed one at a time
+      with the 4.8 rename; skipped, one `dhis2-instance edit <name> --name <path>` line per instance printed and the names
+      marked in `dhis2-instance list`; things left with old names listed
 - [ ] 4.16 Per-hostname `extra.conf`: always included, created empty, never overwritten by `rebuild`
 - [ ] 4.17 On apache servers every phase 4 action refuses with exit 1, `not_on_apache`, until phase 4a
 
