@@ -156,7 +156,7 @@ All state about an instance lives on its container:
 | `user.dhis2.backup` | `plain` / `encrypted` / `no` | [planned, phase 6] create-instance |
 | `user.dhis2.postgres` | the postgres container holding its database | [planned, phase 6] create-instance |
 | `user.dhis2.hostname`, `user.dhis2.path` | [planned, phase 4] | create-instance, `dhis2-move-instance` |
-| `user.dhis2.description` | shown on the hostname's list page, e.g. `Production` [planned, phase 4] | create-instance |
+| `user.dhis2.description` | shown on the hostname's list page, e.g. `Production` [planned, phase 4] | create-instance, `dhis2-describe-instance` |
 
 Instances made by older versions are labelled by `dhis2-upgrade-setup` (version from the deployed war's `dhis-api-*.jar`).
 `dhis2-list-instances` [built] shows them: name, version, URL, Tomcat, Java, IP, status, Glowroot, Munin; `--json`.
@@ -225,7 +225,8 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
     and port 80 redirects to it (except the check). Munin's location is only in Munin's hostname.
   - The list page: the hostname as title and a link per instance (`/prod`) with its **description** (e.g. "Production"),
     no DHIS2 versions or other details (the page is public). Descriptions are HTML-escaped. The description is a label on
-    the instance (`user.dhis2.description`), asked when it is created (`--description`, optional).
+    the instance (`user.dhis2.description`), asked when it is created (`--description`, optional), and changed later with
+    `dhis2-describe-instance <instance> "<text>"` (`--clear` to remove), which rebuilds that hostname's list page.
   - The root redirect is temporary (302), so a change takes effect at once for everyone.
 - **`dhis2-hostname`** (agreed 2026-09-27), with the usual `-y`, `--dry-run`, `-h`:
   - `add <hostname>`: DNS check (retry), short name, certificate email, certificate (section D), nginx config; root starts as the

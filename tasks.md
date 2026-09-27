@@ -255,6 +255,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] 4.7 `dhis2-delete-instance` (`--remove-hostname yes|no` for automation): remove the instance from its hostname. If it was the last one there, offer to remove the subdomain (never the fqdn)
 - [ ] 4.8 `dhis2-move-instance <name> -H <hostname> [-p <path>]`: summary, `-y`, `--dry-run`
 - [ ] 4.9 Glowroot at `/<path>-glowroot`
+- [ ] 4.11 `dhis2-describe-instance <instance> "<text>"` (`--clear`): set the description shown on the list page, rebuild that page
 
 ## Phase 5 – Interactive setup and instance creation
 
