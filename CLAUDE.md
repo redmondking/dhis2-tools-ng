@@ -41,7 +41,8 @@ Real tests are only done on the test server, never on the development machine. L
     large or unclear once work starts, stop and plan it on its own before continuing.
 3.  **Implement:** Follow sections 5 and 6.
 4.  **Check:** Run the local checks in section 3 and fix what they find before moving on.
-5.  **Record:** Update `tasks.md`, and `architecture.md` if a decision changed (section "Updating architecture.md"), in the same commit.
+5.  **Record:** Update `tasks.md`, `CHANGELOG.md` ("Unreleased", for changes a server admin notices), and `architecture.md` if a
+    decision changed (section "Updating architecture.md"), in the same commit.
     Add anything that needs a real server to check to task 1.3. Then mark the task `[~]`.
 6.  **Approve:** The user approves a whole phase, not single tasks. When the user says a phase is tested and approved,
     mark all of its `[~]` tasks `[x]` in one commit. Never mark anything `[x]` without that approval.

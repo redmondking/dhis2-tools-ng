@@ -232,7 +232,7 @@ Rules: `architecture.md`, Command rules. Audit done 2026-09-26. New commands fol
 
 ## Releases (agreed 2026-09-27, `architecture.md`, Versions and releases)  ·  V.1, V.5: 0.1.0; V.2–V.4: 0.2.0
 
-- [ ] V.1 `VERSION` at the repo root, `CHANGELOG.md` (with the work so far under "Unreleased", grouped Added / Changed / Fixed /
+- [~] V.1 `VERSION` at the repo root, `CHANGELOG.md` (with the work so far under "Unreleased", grouped Added / Changed / Fixed /
       Security / Upgrade notes), `RELEASING.md`, `tools/release.sh`
 - [ ] V.2 `install.sh` / `dhis2-tools-update`: channels `stable` (default) / `rc` (remembered per server, `--channel`),
       `--version <x.y.z>` (older refused unless `--force`), `--allow-major` for major updates even with `-y`
