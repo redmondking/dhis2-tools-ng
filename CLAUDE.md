@@ -22,7 +22,7 @@ The repo layout and what runs where are in `architecture.md` sections 1, 2, 4 an
 | :--- | :--- |
 | Syntax check | `bash -n <file>` |
 | Lint | `shellcheck <file>` |
-| Install from `develop` on the test server | `curl -fsSL https://raw.githubusercontent.com/redmondking/dhis2-tools-ng/develop/install.sh \| sudo DHIS2_TOOLS_BRANCH=develop bash` |
+| Install from the release branch on the test server | `curl -fsSL https://raw.githubusercontent.com/redmondking/dhis2-tools-ng/refs/heads/release/0.1.0/install.sh \| sudo DHIS2_TOOLS_BRANCH=release/0.1.0 bash` |
 
 Real tests are only done on the test server, never on the development machine. Locally, check every changed file with
 `bash -n` and `shellcheck`, and test logic with stand-in `lxc`/`curl` scripts in the scratchpad.
@@ -32,7 +32,7 @@ Real tests are only done on the test server, never on the development machine. L
 *   **Tasks and phases:** A task is one numbered line in `tasks.md` (e.g. 3.1). A phase is a group of tasks (e.g. phase 3).
 *   **Branches:** Work on the branch of the version being built, `release/<version>` (now `release/0.1.0`). `master` holds
     released code only, and stays at the original code (`a37e7db`) until `0.1.0` is released. See `architecture.md` section 12a.
-*   **Merging:** Merge `develop` into `master` only after asking the user and getting a yes in chat. Pushing any branch,
+*   **Merging:** Move `master` to a release (fast-forward from the release branch) only after asking the user and getting a yes in chat. Pushing any branch,
     force-pushing and rebasing are left to the user.
 
 ### Delivery Steps

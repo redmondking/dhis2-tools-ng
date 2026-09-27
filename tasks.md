@@ -16,9 +16,9 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 - **Next step:** phase 4 (hostnames and paths): discuss (including several base domains per server), then plan in plan mode.
 - Testing (phase 1) waits until the scripts are written, as the user asked.
   Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
-- Until `develop` is merged, install on the test server with
+- Until `0.1.0` is released, install on the test server from the release branch with
   `curl -fsSL https://raw.githubusercontent.com/redmondking/dhis2-tools-ng/develop/install.sh | sudo DHIS2_TOOLS_BRANCH=develop bash`
-  (this needs `develop` pushed first).
+  (this needs `release/0.1.0` pushed first; see the command in `CLAUDE.md` section 3, and task V.5).
 
 ## Phase 0 – Bug fixes
 
@@ -37,7 +37,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
   - Claude runs the tests over SSH first. The user re-runs them once all bugs are fixed.
   - Needs from the user: IP/host, SSH user and key access (root or passwordless sudo), and a test domain with DNS for the fqdn and subdomains (a wildcard record is simplest).
 - [ ] 1.2 Install with the **original** scripts (`a37e7db`) and create an instance with glowroot, then run `upgrade_setup.sh` and check every step
-- [ ] 1.3 Fresh install from `develop` on 24.04 (`DHIS2_TOOLS_BRANCH=develop` with the curl installer), then check:
+- [ ] 1.3 Fresh install from `release/0.1.0` on 24.04 (`DHIS2_TOOLS_BRANCH=release/0.1.0` with the curl installer), then check:
   - bug fixes:
     - `-n`
     - `JAVA_HOME`
@@ -90,7 +90,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
       server with a standalone certificate (original scripts): the challenge is added, the certificate moves to webroot and its
       test renewal passes; on a failing test renewal the old renewal config is put back
     - `dhis2-logview`: `-f`, `-r`, `-g` with quotes and `;` in the text (must only search), `-S`/`-U`, `-n`, `--json` on Tomcat 9 and 10
-- [ ] 1.4 Merge `develop` into `master` and push
+- [ ] 1.4 Release `0.1.0`: tag, fast-forward `master`, push (`architecture.md` section 12a)
 
 ## Phase 2 – Install/update, lock down monitoring, modernise the base
 
@@ -221,6 +221,8 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
       `dhis2-tools-update --check` (and `--json`) shows the release notes since the installed version
 - [ ] V.4 Branches: `release/<x.y.z>` per version, rc tags on it, `master` fast-forwards on release (`architecture.md` 12a);
       hotfix details and what happens to finished branches: being settled
+- [ ] V.5 (found 2026-09-27) `install.sh`: branch names now contain `/` (`release/0.1.0`); check the GitHub API request
+      `commits/$BRANCH` works with them (URL-encode `/` as `%2F` if not)
 - Milestones: phases 0–3b tested → `0.1.0`; 3c → `0.2.0`; 4 → `0.3.0`; … `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`
 
 ## Phase 3c – JSON answers from the commands phase 4 doesn't rework
