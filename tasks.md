@@ -221,6 +221,14 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] 4.2 Page at each hostname root that lists its instances, regenerated whenever instances change
 - [ ] 4.3 DNS check for a new subdomain: on failure, explain what to check and offer to retry (without a terminal: exit 1)
 - [ ] 4.4 Certificate per subdomain, with the auto-renewal prompt (`dhis2-ssl-setup --hostname`, `--renew yes|no`)
+- [ ] 4.10 Certificate failure handling (agreed 2026-09-27, `architecture.md` section 4), as shared helpers used by every hostname:
+  - pre-flight checks: automatic staging test first; DNS points here; stray AAAA; CAA excluding Let's Encrypt; the proxy
+    serves a test file from the challenge folder; port 80 reaches the proxy (host `ufw` + NAT)
+  - plain reasons for certbot's common errors, plus the certbot log path
+  - after 3 failed real attempts within an hour refuse unless `--force`; `--wait-dns`
+  - new `dhis2-ssl-status` (`--json`): expiry, last renewal attempt and result, warning under 14 days (also shown by
+    `dhis2-list-instances`)
+  - `dhis2-ssl-setup --json`: success, failed stage, reason, retry time
 - [ ] 4.5 `dhis2-create-instance` prompts:
   1. hostname (existing or new subdomain)
   2. path, validated

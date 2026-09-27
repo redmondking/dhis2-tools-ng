@@ -82,6 +82,18 @@ Admins use `dhis2-*` commands on the host. Later a Nuxt management app and Ansib
   - Renewal: certbot's own systemd timer. `dhis2-ssl-setup` asks whether to renew automatically (`--renew`, default yes).
   - Existing servers: `dhis2-upgrade-setup` adds the challenge location and moves existing certificates from standalone
     (stop/start hooks) to webroot (reload hook).
+  - **Failure handling** (agreed 2026-09-27, built in phase 4 as shared helpers used by every hostname's certificate):
+    1. Checks before the real request: an automatic staging test first (the real request only if it passes); DNS points
+       at this server; a stray AAAA record the server can't answer on; a CAA record that excludes Let's Encrypt; the proxy
+       serves a test file from the challenge folder; port 80 reaches the proxy (host `ufw` and NAT).
+    2. Plain reasons for certbot's common errors (NXDOMAIN, connection timeout, answered by another server, rate limited
+       with the retry time), plus the path of certbot's log for anything else.
+    3. Retries: after 3 failed real attempts within an hour, refuse (with the retry time) unless `--force`; `--wait-dns`
+       re-checks every minute, up to a limit, until the domain points here.
+    4. Renewal failures: `dhis2-ssl-status` (`--json`) shows each certificate's expiry, last renewal attempt and result, and
+       warns under 14 days; the warning also shows where people already look (e.g. `dhis2-list-instances`).
+    5. `dhis2-ssl-setup --json`: success, the failed stage (dns, ipv6, caa, proxy, letsencrypt, config-test), the reason and
+       the retry time.
 - Existing servers keep their containers (20.04, PostgreSQL 13) until phase 8, which moves them to 24.04 and PostgreSQL 16
   in one step, optionally, with a checked backup first.
 
@@ -348,6 +360,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   and deploy-war, the security fixes (logview, ssl-setup), then the rest, one commit per command.
 - 2026-09-27: nginx only re-confirmed (the user asked whether forcing nginx is a problem for organisations using apache; the proxy
   is a container these tools manage, and supporting both would double every proxy feature).
+- 2026-09-27: certificate failure handling (pre-flight checks with an automatic staging test, plain reasons, retry limits and
+  `--wait-dns`, `dhis2-ssl-status` for renewals, `--json`), built in phase 4.
 - 2026-09-27: certificates via certbot webroot (the proxy never stops); `dhis2-ssl-setup` only switches to https once the
   certificate exists and the new config passes its test, otherwise the old config stays (3b.17).
 - 2026-09-26: `dhis2-backup` reads how from `dhis2-env`, what from instance labels (`user.dhis2.backup`, `user.dhis2.postgres`),
