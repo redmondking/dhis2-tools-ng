@@ -12,9 +12,8 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 - Command and flag rules agreed (`architecture.md` section 12). Every command was audited; the results are phase 3b
   (existing commands) and the automation notes in phases 4–9 (new commands).
 - 2026-09-26: the design moved from `CLAUDE.md` into `architecture.md`, restoring sections accidentally deleted in commit `356d186`.
-- Phase 3b is done (all `[~]`) except 3b.17, a bug found on the way (`dhis2-ssl-setup` carries on after certbot fails), which
-  still needs to be agreed.
-- **Next step:** agree 3b.17 with the user, then phase 4 (hostnames and paths): discuss, then plan in plan mode.
+- Phase 3b is done (all `[~]`), including 3b.17 (certbot webroot for nginx, config test with rollback).
+- **Next step:** phase 4 (hostnames and paths): discuss (including several base domains per server), then plan in plan mode.
 - Testing (phase 1) waits until the scripts are written, as the user asked.
   Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
 - Until `develop` is merged, install on the test server with
@@ -87,7 +86,9 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
     - `dhis2-ssl-setup --dry-run` (staging test), then a real run; without a terminal and without `-y` it must stop (exit 3)
     - 3b.17: during `dhis2-ssl-setup`, a loop of `curl` requests shows no failed request (nginx never stops); `certbot renew --dry-run`
       works; with DNS not pointing at the server the site stays up on http and the command exits 1; the rendered https
-      `nginx.conf` passes `nginx -t` and `http://<fqdn>/.well-known/acme-challenge/x` is not redirected
+      `nginx.conf` passes `nginx -t` and `http://<fqdn>/.well-known/acme-challenge/x` is not redirected; `dhis2-upgrade-setup` on a
+      server with a standalone certificate (original scripts): the challenge is added, the certificate moves to webroot and its
+      test renewal passes; on a failing test renewal the old renewal config is put back
     - `dhis2-logview`: `-f`, `-r`, `-g` with quotes and `;` in the text (must only search), `-S`/`-U`, `-n`, `--json` on Tomcat 9 and 10
 - [ ] 1.4 Merge `develop` into `master` and push
 
@@ -200,7 +201,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [~] 3b.11 `dhis2-tools-update --check --json` → `{"current", "latest", "update_available"}`
 - [~] 3b.12 `dhis2-glowroot-login` / `dhis2-munin-login`: `--dry-run`, summary + confirm; glowroot-login also `--restart yes|no` (which instances would change and restart)
 - [~] 3b.13 `dhis2-tomcat-munin`: stop at the first failure and exit non-zero (names the failed step)
-- [ ] 3b.17 (found in 3b.9) `dhis2-ssl-setup`: stop when certbot fails. Today it carries on and switches nginx to a certificate
+- [~] 3b.17 (found in 3b.9) `dhis2-ssl-setup`: stop when certbot fails. Today it carries on and switches nginx to a certificate
       that doesn't exist, which breaks the proxy. Agreed fix (2026-09-27): certbot **webroot** (the proxy never stops), https config
       only after the certificate exists, config test with rollback, and a `dhis2-upgrade-setup` step moving existing certificates
       from standalone to webroot (`architecture.md` section 4)

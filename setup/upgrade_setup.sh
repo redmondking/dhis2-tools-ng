@@ -143,11 +143,91 @@ if [[ -f /etc/cron.d/certbot ]] && grep -q -- '--standalone --pre-hook=' /etc/cr
   else rm /etc/cron.d/certbot; echo "Removed the misplaced /etc/cron.d/certbot from the host"; fi
 fi
 
+# nginx: certbot --webroot, so the proxy never stops for certbot (older setups used standalone, which stops it).
+# The edits are done with awk on the host, on copies pulled from the proxy, so only known lines change.
+
+# nginx_add_challenge: nginx.conf on stdin -> the same with the challenge location in every port-80 server block
+nginx_add_challenge() {
+  awk '
+    /include +default\.d\/\*\.conf;/ {
+      print; match($0, /^ */); print substr($0, 1, RLENGTH) "include  snippets/acme-challenge.conf;"; next }
+    /^ *return 301 https:\/\/\$host\$request_uri;/ {
+      match($0, /^ */); i = substr($0, 1, RLENGTH)
+      print i "include snippets/acme-challenge.conf;"
+      print i "location / {"
+      print i "  return 301 https://$host$request_uri;"
+      print i "}"
+      next }
+    { print }'
+}
+
+# renewal_to_webroot FQDN: a standalone renewal config on stdin -> the webroot version (certbot's own format)
+renewal_to_webroot() {
+  awk -v fqdn="$1" '
+    /^authenticator = standalone$/ { print "authenticator = webroot"; print "webroot_path = /var/www/letsencrypt,"; next }
+    /^(pre_hook|post_hook|renew_hook) = / { next }
+    /^\[renewalparams\]$/ { print; print "renew_hook = service nginx reload"; next }
+    { print }
+    END { print "[[webroot_map]]"; print fqdn " = /var/www/letsencrypt" }'
+}
+
 RENEWAL_CONF=/etc/letsencrypt/renewal/${FQDN}.conf
-if ! lxc exec proxy -- test -f "$RENEWAL_CONF"; then
-  echo "No certificate for $FQDN on the proxy, nothing to do (run ./ssl_setup.sh to get one)"
+if [[ $PROXY == nginx ]]; then
+  # 1. the proxy serves Let's Encrypt's check from /var/www/letsencrypt
+  if lxc exec proxy -- grep -q 'snippets/acme-challenge.conf' /etc/nginx/nginx.conf \
+     && lxc exec proxy -- test -f /etc/nginx/snippets/acme-challenge.conf; then
+    echo "The proxy already serves Let's Encrypt's check (webroot)"
+  elif dry; then
+    echo "would: let the proxy serve Let's Encrypt's check from /var/www/letsencrypt (nginx.conf is tested before reloading)"
+  else
+    WORK=$(mktemp -d)
+    lxc file pull proxy/etc/nginx/nginx.conf "$WORK/nginx.conf"
+    if grep -q 'snippets/acme-challenge.conf' "$WORK/nginx.conf"; then
+      cp "$WORK/nginx.conf" "$WORK/nginx.conf.new"
+    else
+      nginx_add_challenge < "$WORK/nginx.conf" > "$WORK/nginx.conf.new"
+    fi
+    lxc exec proxy -- mkdir -p /var/www/letsencrypt /etc/nginx/snippets
+    lxc file push configs/nginx-acme-challenge.conf proxy/etc/nginx/snippets/acme-challenge.conf
+    lxc exec proxy -- cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.before-webroot
+    lxc file push "$WORK/nginx.conf.new" proxy/etc/nginx/nginx.conf
+    rm -rf "$WORK"
+    if lxc exec proxy -- nginx -t; then
+      lxc exec proxy -- service nginx reload
+      echo "The proxy now serves Let's Encrypt's check (backup: /etc/nginx/nginx.conf.before-webroot)"
+    else
+      lxc exec proxy -- cp /etc/nginx/nginx.conf.before-webroot /etc/nginx/nginx.conf
+      echo "WARNING: the changed nginx.conf failed nginx's test, so the previous one was put back; certificates keep renewing as before"
+    fi
+  fi
+
+  # 2. an existing standalone certificate moves to webroot, checked with a test renewal
+  if ! lxc exec proxy -- test -f "$RENEWAL_CONF"; then
+    echo "No certificate for $FQDN on the proxy yet (get one with: sudo dhis2-ssl-setup)"
+  elif ! lxc exec proxy -- grep -q '^authenticator = standalone$' "$RENEWAL_CONF"; then
+    echo "The certificate for $FQDN already renews without stopping the proxy"
+  elif dry; then
+    echo "would: move the certificate for $FQDN from standalone (stops the proxy) to webroot, checked with a test renewal"
+  elif ! lxc exec proxy -- grep -q 'snippets/acme-challenge.conf' /etc/nginx/nginx.conf; then
+    echo "WARNING: the certificate for $FQDN still renews with standalone, because the proxy can't serve the check yet"
+  else
+    WORK=$(mktemp -d)
+    lxc file pull "proxy$RENEWAL_CONF" "$WORK/renewal.conf"
+    renewal_to_webroot "$FQDN" < "$WORK/renewal.conf" > "$WORK/renewal.conf.new"
+    lxc exec proxy -- cp "$RENEWAL_CONF" "$RENEWAL_CONF.before-webroot"
+    lxc file push "$WORK/renewal.conf.new" "proxy$RENEWAL_CONF"
+    rm -rf "$WORK"
+    if lxc exec proxy -- certbot renew --dry-run --cert-name "$FQDN"; then
+      echo "The certificate for $FQDN now renews without stopping the proxy (webroot, reload after renewal)"
+    else
+      lxc exec proxy -- cp "$RENEWAL_CONF.before-webroot" "$RENEWAL_CONF"
+      echo "WARNING: the test renewal with webroot failed, so the certificate for $FQDN keeps renewing as before (standalone)"
+    fi
+  fi
+elif ! lxc exec proxy -- test -f "$RENEWAL_CONF"; then
+  echo "No certificate for $FQDN on the proxy, nothing to do (get one with: sudo dhis2-ssl-setup)"
 else
-  # certbot --standalone needs port 80, so the proxy must stop while it renews
+  # apache (until phase 8 moves it to nginx): certbot --standalone needs port 80, so the proxy must stop while it renews
   if lxc exec proxy -- grep -q '^pre_hook' "$RENEWAL_CONF"; then
     echo "Renewal hooks already set"
   elif dry; then
@@ -156,6 +236,9 @@ else
     lxc exec proxy -- sed -i "/^\[renewalparams\]/a pre_hook = service $PROXY stop\npost_hook = service $PROXY start" "$RENEWAL_CONF"
     echo "Added stop/start hooks for $PROXY to $RENEWAL_CONF"
   fi
+fi
+
+if lxc exec proxy -- test -f "$RENEWAL_CONF"; then
   if [[ -n $RENEW_OPT ]]; then [[ $RENEW_OPT == yes ]] && RENEWAL=enable || RENEWAL=disable
   elif confirm "Renew the certificate automatically?"; then RENEWAL=enable; else RENEWAL=disable; fi
   if dry; then
