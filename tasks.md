@@ -5,6 +5,24 @@ Phases are roughly in order: each phase builds on the ones before it.
 
 Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
+## Versions
+
+Each version is a release branch `release/<version>` (`architecture.md` section 12a). A version is released once its phases are
+tested on the test server and approved. `(proposed)` = waiting for the user's confirmation.
+
+| Version | Phases and tasks | State |
+|---|---|---|
+| **0.1.0** | 0, 2, 3, 3b; release files V.1 *(proposed)*; V.5; tested in phase 1 | written, untested; branch `release/0.1.0` |
+| **0.2.0** | 3c (JSON answers, live results, `dhis2-run`); V.2–V.4 (channels, versions shown, branches) | agreed, not built |
+| **0.3.0** | 4 (hostnames and paths, `dhis2-instance`, `dhis2-hostname`, certificate failure handling) | being discussed |
+| **0.4.0** | 5 (setup wizard, `--config`, admin login, memory) | agreed, not built |
+| **0.5.0** | 6 (backups, remotes, `dhis2-list-backups`) | agreed, not built |
+| **0.6.0** | 8 (bring existing servers forward) | agreed, not built |
+| **1.0.0** | release candidates of all the above; docs rewrite 10.1 *(proposed)* | |
+| 1.1.0 | 7 (create an instance from a backup) | agreed, not built |
+| 1.2.0 | 9 (DHIS2 version upgrades) | to design |
+| later 1.x | 10.2 (whiptail), the "Later" list | |
+
 ## Where we are (2026-09-26)
 
 - Branch `release/0.1.0` (renamed from `develop` on 2026-09-27), nothing pushed. `master` is still the original code (`a37e7db`).
@@ -20,7 +38,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
   `curl -fsSL https://raw.githubusercontent.com/redmondking/dhis2-tools-ng/refs/heads/release/0.1.0/install.sh | sudo DHIS2_TOOLS_BRANCH=release/0.1.0 bash`
   (this needs `release/0.1.0` pushed first; see the command in `CLAUDE.md` section 3, and task V.5).
 
-## Phase 0 – Bug fixes
+## Phase 0 – Bug fixes  ·  version 0.1.0
 
 - [~] 0.1 `dhis2-create-instance`: `-n` ignored, `JAVA_HOME` rendered as `java-{{ 17 }}-...`, gawk-only free-IP pick, prefix-matching name checks
 - [~] 0.2 `ssl_setup.sh`: renewal cron written to the host. Now uses certbot's own timer, with a prompt for auto-renewal
@@ -31,7 +49,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 - [~] 0.7 rsyslog logger: wrong subnet, broken config, apt prompt
 - [~] 0.8 `upgrade_setup.sh`: repairs servers installed with the old scripts
 
-## Phase 1 – Test what's done
+## Phase 1 – Test what's done  ·  testing for each version (currently 0.1.0)
 
 - [ ] 1.1 Test server: Ubuntu 24.04, public IP, can be wiped completely.
   - Claude runs the tests over SSH first. The user re-runs them once all bugs are fixed.
@@ -92,7 +110,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
     - `dhis2-logview`: `-f`, `-r`, `-g` with quotes and `;` in the text (must only search), `-S`/`-U`, `-n`, `--json` on Tomcat 9 and 10
 - [ ] 1.4 Release `0.1.0`: tag, fast-forward `master`, push (`architecture.md` section 12a)
 
-## Phase 2 – Install/update, lock down monitoring, modernise the base
+## Phase 2 – Install/update, lock down monitoring, modernise the base  ·  version 0.1.0
 
 - [~] 2.1 Proxy, postgres and monitor containers on Ubuntu 24.04 (`create_containers.sh`, `change_webserver.sh`); instances on 22.04 until phase 3
 - [~] 2.2 `postgres` type: PostgreSQL 16 + `postgis-3` from Ubuntu's own packages. `postgres12` deleted
@@ -117,7 +135,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 Moved: 2.4 (Tomcat per instance) → 3.0; 2.11 (switch apache servers to nginx) → 8.8.
 
-## Phase 3 – Multiple DHIS2 versions
+## Phase 3 – Multiple DHIS2 versions  ·  version 0.1.0
 
 Requirements agreed with the user on 2026-09-26.
 
@@ -161,7 +179,7 @@ Requirements agreed with the user on 2026-09-26.
 - Checked locally: feed helpers against the live feed; a real 2.38.7 war downloaded, checksum ok, release read from it;
   every `dhis2-deploy-war` rule with a stand-in `lxc`; `dhis2-list-instances` table and `--json`.
 
-## Phase 3b – Existing commands follow the command and flag rules
+## Phase 3b – Existing commands follow the command and flag rules  ·  version 0.1.0
 
 Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-09-26. New commands follow the rules when they are built (flags listed in their phase below).
 
@@ -210,7 +228,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [~] 3b.15 `--password-stdin` → `--secrets-stdin` in `dhis2-create-instance`, `dhis2-glowroot-login`, `dhis2-munin-login`;
       `-U` → `--glowroot-user` / `--munin-user` (keep `-U` as a short form)
 
-## Releases (agreed 2026-09-27, `architecture.md` section 12a)
+## Releases (agreed 2026-09-27, `architecture.md` section 12a)  ·  V.1, V.5: 0.1.0; V.2–V.4: 0.2.0
 
 - [ ] V.1 `VERSION` at the repo root, `CHANGELOG.md` (with the work so far under "Unreleased", grouped Added / Changed / Fixed /
       Security / Upgrade notes), `RELEASING.md`, `tools/release.sh`
@@ -226,7 +244,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
       `commits/$BRANCH` works with them (URL-encode `/` as `%2F` if not)
 - Milestones: phases 0–3b tested → `0.1.0`; 3c → `0.2.0`; 4 → `0.3.0`; … `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`
 
-## Phase 3c – JSON answers from the commands phase 4 doesn't rework
+## Phase 3c – JSON answers from the commands phase 4 doesn't rework  ·  version 0.2.0
 
 - [ ] 3c.1 `--json` answers (`architecture.md` section 12) in the shared helpers: `die` / `check_missing` / `confirm_summary`
       produce the error and dry-run objects; a `json_result` helper for success
@@ -240,7 +258,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - Phase 4 adds `--json` to the commands it reworks (create/delete/move instance, `dhis2-hostname`, `dhis2-ssl-setup`); they use the
   3c helpers, so `--json-stream`/`--detach` come with them
 
-## Phase 4 – Hostnames and paths
+## Phase 4 – Hostnames and paths  ·  version 0.3.0
 
 - Section A (domains) discussed 2026-09-27: any hostname whose DNS points here (no base domains); `fqdn` → `default_hostname`;
   Munin's hostname a setting; a certificate email per hostname (`architecture.md` section 7). Sections B–G still to discuss.
@@ -275,7 +293,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
       replacing `dhis2-create-instance`, `dhis2-delete-instance`, `dhis2-deploy-war`, `dhis2-list-instances` (no links under the old names)
 - [ ] 4.12 `dhis2-upgrade-setup`: move copies of the retired command names aside on existing servers and print the new commands
 
-## Phase 5 – Interactive setup and instance creation
+## Phase 5 – Interactive setup and instance creation  ·  version 0.4.0
 
 - [ ] 5.1 Setup wizard `setup.sh`: asks FQDN, email, TZ, monitoring, Glowroot defaults and login mode, backups, then writes `containers.json`
 - [ ] 5.1b `setup.sh --dry-run`: check the config and print what would be set up
@@ -295,7 +313,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] 5.4 Memory for the instance (Java heap + container limit), default based on free RAM (`--memory <size>`)
 - Automation: `--dhis2-user`; the admin password is `dhis2_password` in `--secrets-stdin` (see `architecture.md` section 12)
 
-## Phase 6 – Backups
+## Phase 6 – Backups  ·  version 0.5.0
 
 - Where `dhis2-backup` gets its information (agreed 2026-09-26, details in `architecture.md` section 10):
   `dhis2-env` = how (server-wide settings), instance labels = what (`user.dhis2.backup`, `user.dhis2.postgres`),
@@ -381,7 +399,7 @@ Install the key on backup.example.org now? [Y/n]
 Testing: connect ✓  write ✓  delete test file ✓
 ```
 
-## Phase 7 – Create an instance from a backup
+## Phase 7 – Create an instance from a backup  ·  version 1.1.0
 
 - [ ] 7.1 `dhis2-create-instance` asks "Restore from a backup? [y/N]":
   - Offer a menu of the backups found in `BACKUP_DIR` (instance, date, type, size), or let the user give another file path.
@@ -395,7 +413,7 @@ Testing: connect ✓  write ✓  delete test file ✓
 - [ ] 7.4 Accept encrypted backups (`.sql.gz.enc`): ask for the password file [`PASSWORD_FILE` from `dhis2-env`]. `dhis2-restoredb` gets the same support
 - [ ] 7.5 If a matching `<name>.files.tar.gz[.enc]` sits next to the database backup, offer to restore it into `/opt/dhis2/files` (owned by tomcat)
 
-## Phase 8 – Bring existing servers forward (`upgrade_setup.sh`)
+## Phase 8 – Bring existing servers forward (`upgrade_setup.sh`)  ·  version 0.6.0
 
 - [ ] 8.1 Label existing instances with `hostname` = fqdn and `path` = container name (version/tomcat/java moved to 3.8)
 - [ ] 8.2 Move proxy config to the per-hostname layout
@@ -416,7 +434,7 @@ Testing: connect ✓  write ✓  delete test file ✓
 - [ ] 8.8 On apache servers, offer to switch to nginx (rework `change_webserver.sh`: hardcoded 192.168.0.3 and network, per-hostname layout).
       Delete apache support (`containers/apache_proxy*`, `configs/apache-dhis2.conf`, apache branches) once that switch is tested
 
-## Phase 9 – DHIS2 version upgrade script (last)
+## Phase 9 – DHIS2 version upgrade script (last)  ·  version 1.2.0
 
 - [ ] 9.1 Design first. Things to handle:
   - allowed upgrade steps (one version at a time?)
@@ -434,7 +452,7 @@ Testing: connect ✓  write ✓  delete test file ✓
   - downtime warning and confirmation
 - [ ] 9.2 Build `dhis2-upgrade-instance`: `-V <release>`, summary, `-y`, `--dry-run`, backup first (default yes)
 
-## Phase 10 – Docs and polish
+## Phase 10 – Docs and polish  ·  10.1 in 1.0.0 (proposed), 10.2 later
 
 - [ ] 10.1 Rewrite `README.md` and `docs/`, which describe Ubuntu 18.04, PostgreSQL 10 and a 2.33 war
 - [ ] 10.2 Switch prompts to `whiptail` once everything above is tested
