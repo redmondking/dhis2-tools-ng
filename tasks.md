@@ -17,7 +17,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 - Testing (phase 1) waits until the scripts are written, as the user asked.
   Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
 - Until `0.1.0` is released, install on the test server from the release branch with
-  `curl -fsSL https://raw.githubusercontent.com/redmondking/dhis2-tools-ng/develop/install.sh | sudo DHIS2_TOOLS_BRANCH=develop bash`
+  `curl -fsSL https://raw.githubusercontent.com/redmondking/dhis2-tools-ng/refs/heads/release/0.1.0/install.sh | sudo DHIS2_TOOLS_BRANCH=release/0.1.0 bash`
   (this needs `release/0.1.0` pushed first; see the command in `CLAUDE.md` section 3, and task V.5).
 
 ## Phase 0 – Bug fixes
