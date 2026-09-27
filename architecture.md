@@ -391,7 +391,7 @@ Six commands, each `<command> <action> [options]`, each action in its own file i
 | `dhis2-hostname` | `add`, `list`, `set-root`, `set-munin`, `remove`, `rebuild`, `cert` (get / retry / replace a certificate, `--own` files), `certs` (expiry and last renewal of all) |
 | `dhis2-backup` | `run` (the nightly job), `list`, `restore`, `remote add\|list\|test\|sync\|remove` |
 | `dhis2-monitoring` | `glowroot [instance]` (set a Glowroot login), `munin` (set the Munin login) |
-| `dhis2-server` | `setup` (the wizard), `update` (new tools: `--check`, `--rollback`, `--version`, `--channel`), `db-activity`, and the step that brings the server's setup up to the installed tools (name pending: `migrate` proposed; `repair` is kept for real repairs) |
+| `dhis2-server` | `setup` (the wizard), `update` (new tools: `--check`, `--rollback`, `--version`, `--channel`), `migrate` (brings the server's setup up to the installed tools: was `dhis2-upgrade-setup`; `repair` is kept free for real repairs later), `db-activity` |
 | `dhis2-run` | `follow`, `status`, `list` |
 
 - `install.sh` stays separate: the one-line bootstrap before any command exists.

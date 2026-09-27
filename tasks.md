@@ -298,7 +298,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] 4.12 `dhis2-upgrade-setup`: move copies of the retired command names aside on existing servers and print the new commands
 - [ ] 4.13 Regroup all commands into six (`architecture.md` section 11a): `dhis2-instance` (+ `logs`), `dhis2-hostname` (+ `cert`,
       `certs`), `dhis2-backup` (`run`, `list`, `restore`, `remote …`), `dhis2-monitoring` (`glowroot`, `munin`), `dhis2-server`
-      (`setup`, `update`, `db-activity`, the migrate step), `dhis2-run`; retire every old name on existing servers (with 4.12)
+      (`setup`, `update`, `migrate`, `db-activity`), `dhis2-run`; retire every old name on existing servers (with 4.12)
 
 ## Phase 5 – Interactive setup and instance creation  ·  version 0.4.0
 
