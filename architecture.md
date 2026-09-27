@@ -428,6 +428,12 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
   - `tools/release.sh <version>` (in the repo, never installed on servers) checks the number is valid and newer, updates
     `VERSION` and `CHANGELOG.md`, commits and tags locally, and prints the push and `gh release create` commands. It never pushes.
   - `RELEASING.md` in the repo describes the process.
+- **Numbering until 1.0.0** (agreed 2026-09-27): `0.x` milestones. A `0.x` version may still change in breaking ways.
+  - Phases 0–3b, once tested on the test server: **`0.1.0`**. Phase 3c: `0.2.0`. Phase 4: `0.3.0`. And so on, one minor version
+    per tested chunk.
+  - **`1.0.0` contains phases 0–6 and 8**: everything a new or an existing server needs day to day. Then `1.0.0-rc.N` on the test
+    server, then `1.0.0`.
+  - After `1.0.0`: phase 7 (create from a backup), phase 9 (DHIS2 upgrades) and phase 10 (docs, whiptail) as `1.x` releases.
 
 ## 13. Management app and automation
 
@@ -476,6 +482,7 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
   phase 3c for the rest.
+- 2026-09-27: `0.x` milestones before `1.0.0` (phases 0–3b = `0.1.0` once tested); `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`.
 - 2026-09-27: releases: changelog kept up as work happens; tag + GitHub Release; `tools/release.sh` prepares locally, the user
   pushes; `RELEASING.md`.
 - 2026-09-27: the tools get versions: semantic versioning, flags and JSON output count as the interface, release candidates

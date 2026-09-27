@@ -210,6 +210,13 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [~] 3b.15 `--password-stdin` → `--secrets-stdin` in `dhis2-create-instance`, `dhis2-glowroot-login`, `dhis2-munin-login`;
       `-U` → `--glowroot-user` / `--munin-user` (keep `-U` as a short form)
 
+## Releases (agreed 2026-09-27, `architecture.md` section 12a)
+
+- [ ] V.1 `VERSION` at the repo root, `CHANGELOG.md` (with the work so far under "Unreleased", grouped Added / Changed / Fixed /
+      Security / Upgrade notes), `RELEASING.md`, `tools/release.sh`
+- [ ] V.2 What servers install and how versions are shown: discussion R3–R5 still open
+- Milestones: phases 0–3b tested → `0.1.0`; 3c → `0.2.0`; 4 → `0.3.0`; … `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`
+
 ## Phase 3c – JSON answers from the commands phase 4 doesn't rework
 
 - [ ] 3c.1 `--json` answers (`architecture.md` section 12) in the shared helpers: `die` / `check_missing` / `confirm_summary`
