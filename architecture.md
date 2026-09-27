@@ -69,8 +69,16 @@ Admins use `dhis2-*` commands on the host. Later a Nuxt management app and Ansib
   support is deleted once that is tested.
 - One shared PostgreSQL 16 container for all instances. The DHIS2 docs require ≥9.6 for 2.38/2.39 and recommend 14, but say
   nothing about 16, so 2.38 on 16 is on the test list. If it fails, a second postgres container on 14 for old versions.
-- Certificate renewal: certbot's own systemd timer, with stop/start hooks for the proxy saved in the renewal config.
-  `dhis2-ssl-setup` asks whether to renew automatically.
+- Certificates (agreed 2026-09-27): certbot in **webroot** mode, from the apt `certbot` package; no nginx plugin, no standalone.
+  - The proxy serves `/.well-known/acme-challenge/` from `/var/www/letsencrypt`; certbot writes its check file there, so the
+    proxy **never stops**, neither when a certificate is issued nor at renewals.
+  - A deploy hook reloads the proxy after a renewal, so it picks up the new certificate without interrupting anyone.
+  - `dhis2-ssl-setup` gets the certificate first. Only when certbot succeeded and the certificate files exist does it write
+    the https config; it then **tests** it (`nginx -t` / `apache2ctl -t`) and reloads. A failed test puts the old config back.
+    On any failure the site stays up on http, unchanged, and the command exits 1.
+  - Renewal: certbot's own systemd timer. `dhis2-ssl-setup` asks whether to renew automatically (`--renew`, default yes).
+  - Existing servers: `dhis2-upgrade-setup` adds the challenge location and moves existing certificates from standalone
+    (stop/start hooks) to webroot (reload hook).
 - Existing servers keep their containers (20.04, PostgreSQL 13) until phase 8, which moves them to 24.04 and PostgreSQL 16
   in one step, optionally, with a checked backup first.
 
@@ -335,5 +343,7 @@ collected and done only with `--restart yes` or a yes at the end (default no).
 - 2026-09-26 (phase 3b): create-only asks the version line (`--line`); `dhis2-restoredb` stops the instance's Tomcat, restores and
   starts it again when the database belongs to an instance; every short flag gets a long name; 3b order: helpers, create-instance
   and deploy-war, the security fixes (logview, ssl-setup), then the rest, one commit per command.
+- 2026-09-27: certificates via certbot webroot (the proxy never stops); `dhis2-ssl-setup` only switches to https once the
+  certificate exists and the new config passes its test, otherwise the old config stays (3b.17).
 - 2026-09-26: `dhis2-backup` reads how from `dhis2-env`, what from instance labels (`user.dhis2.backup`, `user.dhis2.postgres`),
   and where to copy from the remotes files; the old lists stay only for databases without an instance.

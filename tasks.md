@@ -198,7 +198,9 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [~] 3b.12 `dhis2-glowroot-login` / `dhis2-munin-login`: `--dry-run`, summary + confirm; glowroot-login also `--restart yes|no` (which instances would change and restart)
 - [~] 3b.13 `dhis2-tomcat-munin`: stop at the first failure and exit non-zero (names the failed step)
 - [ ] 3b.17 (found in 3b.9) `dhis2-ssl-setup`: stop when certbot fails. Today it carries on and switches nginx to a certificate
-      that doesn't exist, which breaks the proxy
+      that doesn't exist, which breaks the proxy. Agreed fix (2026-09-27): certbot **webroot** (the proxy never stops), https config
+      only after the certificate exists, config test with rollback, and a `dhis2-upgrade-setup` step moving existing certificates
+      from standalone to webroot (`architecture.md` section 4)
 - [~] 3b.16 Every short flag also gets a long name, both in `-h` (`-V`/`--release`, `-g`/`--glowroot`, `-m`/`--munin`, ...)
 - Order (agreed): 3b.1 helpers → 3b.2 create-instance, 3b.3 deploy-war → security fixes 3b.7 logview, 3b.9 ssl-setup → the rest.
 - [~] 3b.15 `--password-stdin` → `--secrets-stdin` in `dhis2-create-instance`, `dhis2-glowroot-login`, `dhis2-munin-login`;
