@@ -216,7 +216,10 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
       Security / Upgrade notes), `RELEASING.md`, `tools/release.sh`
 - [ ] V.2 `install.sh` / `dhis2-tools-update`: channels `stable` (default) / `rc` / `develop` (remembered per server, `--channel`),
       `--version <x.y.z>` (older refused unless `--force`), `--allow-major` for major updates even with `-y`
-- [ ] V.3 How versions are shown: discussion R4–R5 still open
+- [ ] V.3 `--version` on every command (shared helpers); the tools version in every `--json` answer and run log;
+      `/opt/dhis2-tools/VERSION` (release number) + `INSTALL.json` (version, channel, commit, time); `-dev+<commit>` on develop;
+      `dhis2-tools-update --check` (and `--json`) shows the release notes since the installed version
+- [ ] V.4 Branches: discussion R5 still open
 - Milestones: phases 0–3b tested → `0.1.0`; 3c → `0.2.0`; 4 → `0.3.0`; … `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`
 
 ## Phase 3c – JSON answers from the commands phase 4 doesn't rework

@@ -443,6 +443,15 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
   - A major update (e.g. `1.x` → `2.0.0`) is never silent: even with `-y` it needs `--allow-major`, otherwise it stops and
     shows what's new. Minor and patch updates go ahead as normal.
   - No automatic updates for now: a server updates only when someone runs `dhis2-tools-update` (automatic updates: later).
+- **Seeing versions** (agreed, R4):
+  - Every command answers `--version` (`dhis2-tools 1.2.0 (stable)`), from the shared helpers; every `--json` answer and every
+    run log includes the tools version.
+  - On the server: `/opt/dhis2-tools/VERSION` holds the release number (e.g. `1.2.0`); `/opt/dhis2-tools/INSTALL.json` holds
+    version, channel, commit and install time. On `develop`, the repo's `VERSION` names the next version with `-dev`
+    (e.g. `1.3.0-dev`) and the server shows `1.3.0-dev+<short commit>`.
+  - `dhis2-tools-update --check` shows the installed version and channel, the newest available, and the release notes of every
+    release in between (from GitHub Releases); `--check --json` gives the same as `installed`, `channel`, `latest`,
+    `update_available`, `major`, `releases: [{version, date, notes}]`.
 
 ## 13. Management app and automation
 
@@ -491,6 +500,7 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
   phase 3c for the rest.
+- 2026-09-27: `--version` on every command; `VERSION` + `INSTALL.json` on servers; `--check` shows release notes (also in JSON).
 - 2026-09-27: channels stable / rc / develop; `--version`; `--allow-major` for major updates; no automatic updates yet.
 - 2026-09-27: `0.x` milestones before `1.0.0` (phases 0–3b = `0.1.0` once tested); `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`.
 - 2026-09-27: releases: changelog kept up as work happens; tag + GitHub Release; `tools/release.sh` prepares locally, the user
