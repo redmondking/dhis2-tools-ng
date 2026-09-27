@@ -265,7 +265,10 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 
 - [ ] 4.1 nginx layout with one server block per hostname. Existing upstream files keep working under the fqdn
 - [ ] 4.2 Each hostname's root: a list page of its instances (regenerated whenever instances change) or a redirect to a chosen instance (`architecture.md` section 7)
-- [ ] 4.3 DNS check for a new subdomain: on failure, explain what to check and offer to retry (without a terminal: exit 1)
+- [ ] 4.3 DNS check for a new hostname against `public_ip` (new setting, suggested by the wizard from an outside lookup): on failure,
+      explain what to check and offer retry / `--wait-dns` / cancel (without a terminal: exit 1, `dns_not_pointing_here`)
+- [ ] 4.3a Certificate choice per hostname: Let's Encrypt (default) / own files (`--cert-file`, `--key-file`; checked, installed,
+      `nginx -t`) / none (http only, warned); a failed Let's Encrypt certificate leaves the hostname "http only, certificate pending"
 - [ ] 4.4 Certificate per subdomain, with the auto-renewal prompt (`dhis2-ssl-setup --hostname`, `--renew yes|no`)
 - [ ] 4.10 Certificate failure handling (agreed 2026-09-27, `architecture.md` section 4), as shared helpers used by every hostname:
   - pre-flight checks: automatic staging test first; DNS points here; stray AAAA; CAA excluding Let's Encrypt; the proxy

@@ -238,6 +238,24 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
     the instance (`user.dhis2.description`), asked when it is created (`--description`, optional), and changed later with
     `dhis2-instance edit <instance> --description "<text>"` (`--clear-description`), which rebuilds that hostname's list page.
   - The root redirect is temporary (302), so a change takes effect at once for everyone.
+- **Adding a hostname** (agreed 2026-09-27, phase 4 section D), `dhis2-hostname add` or "a new hostname" in `dhis2-instance create`:
+  1. the hostname looks valid and isn't on this server yet
+  2. short name (default: its first part) and certificate email (default: the server's email)
+  3. DNS check: it points at this server's **`public_ip`**. That is a setting in `containers.json`: the wizard suggests the
+     address found by asking an outside "what's my IP" service once, and the admin confirms or corrects it (the host itself
+     often only sees a private address behind NAT or a cloud network). On failure: explain (e.g. "points at 198.51.100.7;
+     create an A record pointing to 203.0.113.10"), then retry, wait (`--wait-dns`) or cancel.
+  4. certificate, one of (`--cert letsencrypt|own|none`):
+     - **Let's Encrypt** (default), with the checks and plain reasons from section 4
+     - **own certificate**: certificate and key files (`--cert-file`, `--key-file`), checked (key matches, the hostname is in
+       it, not expired), installed in the proxy, tested with `nginx -t`; the admin renews it (runs the same command again with
+       the new files); `dhis2-ssl-status` warns before it expires
+     - **none**: plain http only (e.g. an internal server Let's Encrypt can't reach), with a clear warning every time
+  5. save its settings, build its nginx config, `nginx -t`, reload
+  6. report the address and how to create instances on it
+  - **If the certificate fails** (DNS fine), the hostname is **kept as "http only, certificate pending"**: its nginx config
+    serves plain http, `dhis2-hostname list`, `dhis2-ssl-status` and `dhis2-instance create` on it show that the certificate is
+    still pending (instances there are served over plain http until then), and `dhis2-ssl-setup --hostname <h>` finishes it.
 - **`dhis2-hostname`** (agreed 2026-09-27), with the usual `-y`, `--dry-run`, `-h`:
   - `add <hostname>`: DNS check (retry), short name, certificate email, certificate (section D), nginx config; root starts as the
     (empty) list
@@ -528,6 +546,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   pushes; `RELEASING.md`.
 - 2026-09-27: the tools get versions: semantic versioning, flags and JSON output count as the interface, release candidates
   (`-rc.N`) before releases, first public release `1.0.0`.
+- 2026-09-27 (phase 4 D): `public_ip` setting for DNS checks; certificates Let's Encrypt (default) / own / none; a failed
+  certificate leaves the hostname "http only, certificate pending", finished later with `dhis2-ssl-setup --hostname`.
 - 2026-09-27 (phase 4 C): one `dhis2-instance` command (create, delete, edit, deploy, list; separate files inside), no links
   under the old names; `dhis2-upgrade-setup` retires the original copies on existing servers.
 - 2026-09-27 (phase 4 C): hostname settings files, proxy config always rebuilt from settings; list page with a description
