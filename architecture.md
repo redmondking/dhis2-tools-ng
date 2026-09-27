@@ -418,6 +418,16 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
   - The first public release is `1.0.0`, launched after testing on the test server. Test versions before a release are
     release candidates: `1.0.0-rc.1`, `1.0.0-rc.2`, …
   - The version is kept in one file in the repo (`VERSION` at the root, e.g. `1.0.0`), so the scripts can show it without git.
+- **Making a release** (agreed, R2):
+  - `CHANGELOG.md` is kept up as work happens: an "Unreleased" section, and every task that changes behaviour adds a line in
+    the same commit, under Added / Changed / Fixed / Security / Upgrade notes (what `dhis2-upgrade-setup` does, and anything
+    an admin must do by hand).
+  - Steps: everything in the release tested and approved (`[x]`) → set `VERSION`, turn "Unreleased" into `## <version> (<date>)`
+    → merge `develop` into `master` (only with the user's yes) → tag `v<version>` on `master` → the user pushes `master` and the
+    tag → GitHub Release `v<version>` with that changelog section as notes (release candidates marked pre-release).
+  - `tools/release.sh <version>` (in the repo, never installed on servers) checks the number is valid and newer, updates
+    `VERSION` and `CHANGELOG.md`, commits and tags locally, and prints the push and `gh release create` commands. It never pushes.
+  - `RELEASING.md` in the repo describes the process.
 
 ## 13. Management app and automation
 
@@ -466,6 +476,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
   phase 3c for the rest.
+- 2026-09-27: releases: changelog kept up as work happens; tag + GitHub Release; `tools/release.sh` prepares locally, the user
+  pushes; `RELEASING.md`.
 - 2026-09-27: the tools get versions: semantic versioning, flags and JSON output count as the interface, release candidates
   (`-rc.N`) before releases, first public release `1.0.0`.
 - 2026-09-27 (phase 4 C): one `dhis2-instance` command (create, delete, edit, deploy, list; separate files inside), no links
