@@ -156,6 +156,7 @@ All state about an instance lives on its container:
 | `user.dhis2.backup` | `plain` / `encrypted` / `no` | [planned, phase 6] create-instance |
 | `user.dhis2.postgres` | the postgres container holding its database | [planned, phase 6] create-instance |
 | `user.dhis2.hostname`, `user.dhis2.path` | [planned, phase 4] | create-instance, `dhis2-move-instance` |
+| `user.dhis2.description` | shown on the hostname's list page, e.g. `Production` [planned, phase 4] | create-instance |
 
 Instances made by older versions are labelled by `dhis2-upgrade-setup` (version from the deployed war's `dhis-api-*.jar`).
 `dhis2-list-instances` [built] shows them: name, version, URL, Tomcat, Java, IP, status, Glowroot, Munin; `--json`.
@@ -211,6 +212,21 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
 - Deleting the last instance on a subdomain asks whether to remove the subdomain's proxy config and certificate
   (`--remove-hostname yes|no`). The fqdn is never removed.
 - `dhis2-move-instance <name> -H <hostname> [-p <path>]` moves an instance to another hostname and/or path.
+- **Proxy layout** (agreed 2026-09-27, phase 4 section C):
+  - Each hostname has a settings file on the host, `/usr/local/etc/dhis/hostnames/<hostname>.json` (short name, certificate
+    email/account, what the root shows). With the instances' labels (hostname, path, description) that is everything needed
+    to build the proxy config.
+  - One helper builds a hostname's nginx config from those settings. Every change updates the settings, rebuilds that
+    hostname's config, runs `nginx -t` and reloads, putting the old config back if the test fails. `dhis2-hostname rebuild`
+    rebuilds from the settings for repairs.
+  - Files in the proxy: `/etc/nginx/sites/<hostname>.conf` (its server blocks), `/etc/nginx/upstream/<hostname>/<path>.conf`
+    (one location per instance), `/var/www/hostnames/<hostname>/index.html` (the list page, when the root shows a list).
+  - Before its certificate a hostname is served over http on port 80 (with Let's Encrypt's check); after it, https on 443
+    and port 80 redirects to it (except the check). Munin's location is only in Munin's hostname.
+  - The list page: the hostname as title and a link per instance (`/prod`) with its **description** (e.g. "Production"),
+    no DHIS2 versions or other details (the page is public). Descriptions are HTML-escaped. The description is a label on
+    the instance (`user.dhis2.description`), asked when it is created (`--description`, optional).
+  - The root redirect is temporary (302), so a change takes effect at once for everyone.
 - **`dhis2-hostname`** (agreed 2026-09-27), with the usual `-y`, `--dry-run`, `-h`:
   - `add <hostname>`: DNS check (retry), short name, certificate email, certificate (section D), nginx config; root starts as the
     (empty) list
@@ -428,6 +444,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
   phase 3c for the rest.
+- 2026-09-27 (phase 4 C): hostname settings files, proxy config always rebuilt from settings; list page with a description
+  per instance; 302 root redirect.
 - 2026-09-27: live results on every command: `--json-stream` (JSON Lines), run log files, `--detach` + `dhis2-run`; built in 3c.
 - 2026-09-27 (phase 4 B): paths `[a-z0-9-]`, 1–40 characters; each hostname's root is a list page or a redirect to a chosen
   instance, asked when an instance is created on it; container names = a short name per hostname (default its first part) +
