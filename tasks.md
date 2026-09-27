@@ -212,10 +212,8 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 
 ## Phase 4 – Hostnames and paths
 
-- **To discuss first (raised 2026-09-27):** several base domains per server instead of one fqdn, each with its own subdomains
-  (e.g. `moh.gov.xx` and `dhis2.ngo.org`). Today's agreed design allows one fqdn plus its subdomains only (`architecture.md` section 7).
-  Would mean: a list of base domains in `containers.json` (`fqdn` stays the main one: Munin, default for new instances), the
-  subdomain rule "a base domain or a subdomain of one", and a small command to manage the list (e.g. `dhis2-domain add|list|remove`).
+- Section A (domains) discussed 2026-09-27: any hostname whose DNS points here (no base domains); `fqdn` → `default_hostname`;
+  Munin's hostname a setting; a certificate email per hostname (`architecture.md` section 7). Sections B–G still to discuss.
 
 - [ ] 4.1 nginx layout with one server block per hostname. Existing upstream files keep working under the fqdn
 - [ ] 4.2 Page at each hostname root that lists its instances, regenerated whenever instances change
