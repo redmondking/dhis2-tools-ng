@@ -184,8 +184,7 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
   Paths (agreed 2026-09-27, phase 4 section B): lowercase letters, digits and `-` only, 1–40 characters, not starting or ending
   with `-` (no `_`: container names can't hold it). Uppercase is refused, not changed. Hostnames are stored in lowercase.
   `/munin` is reserved on Munin's hostname (see below), and so is `/<other path>-glowroot`. No instance *at* `/`.
-- Container name defaults to `<subdomain>-<path>` (`hmis2.example.com/hmis` → `hmis2-hmis`); the user can override it.
-  It is also the database name and role, so scripts must quote it in SQL (`-` is not valid unquoted).
+- The container name is also the database name and role, so scripts must quote it in SQL (`-` is not valid unquoted).
 - Tomcat context = path (war unzipped to `webapps/<path>`), so the proxy never rewrites paths. Glowroot at `/<path>-glowroot`.
 - `dhis2-create-instance` asks: 1) hostname (existing, each shown with its paths, or a new subdomain) 2) path 3) container name.
   Flags `-H <hostname>`, `-p <path>`, both required with `-y`.
@@ -193,8 +192,18 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
   (without a terminal: exit 1). Then its own nginx server block and certificate, asking about auto-renewal.
 - The hostname root (`https://<hostname>/`), chosen per hostname (agreed 2026-09-27, phase 4 section B): **a list of links to
   its instances**, or **a redirect to one of its instances** (`https://<hostname>/` → `/<path>/`; the instance stays at its
-  path, so Tomcat and DHIS2 don't change). Asked when the hostname is added (`--root list|<instance>`), changeable later. If the
-  chosen instance is deleted or moved away, the root falls back to the list.
+  path, so Tomcat and DHIS2 don't change). Changeable later with a command (section C). If the chosen instance is deleted or
+  moved away, the root falls back to the list.
+  - Asked **when an instance is created** on the hostname (a hostname has no instances before that):
+    - first instance: "What should https://<hostname>/ show? 1) This instance 2) A list of its instances" (default 1)
+    - later instances: "https://<hostname>/ currently opens /<path> (…) / shows a list. 1) Keep that 2) Open this new instance
+      instead 3) Show a list" (default: keep)
+  - Automation: `--root this|list|keep`; without it: `this` for the first instance on a hostname, `keep` after that.
+- Container names (agreed 2026-09-27, phase 4 section B): **a short name per hostname + the path**, e.g. `moh-prod`, `ngo-test`.
+  - The short name is asked once, when the first instance is created on a new hostname: "Short name for it, used in instance
+    names [<first part of the hostname>]". It must be unique on the server, so instance names can't clash.
+  - The suggested container name is `<short name>-<path>`; the user can type another (`--name` for automation).
+  - Existing servers: `default_hostname` gets a short name (its first part); existing instances keep their names.
 - Deleting the last instance on a subdomain asks whether to remove the subdomain's proxy config and certificate
   (`--remove-hostname yes|no`). The fqdn is never removed.
 - `dhis2-move-instance <name> -H <hostname> [-p <path>]` moves an instance to another hostname and/or path.
@@ -380,7 +389,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
 - 2026-09-27: nginx only re-confirmed (the user asked whether forcing nginx is a problem for organisations using apache; the proxy
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27 (phase 4 B): paths `[a-z0-9-]`, 1–40 characters; each hostname's root is a list page or a redirect to a chosen
-  instance.
+  instance, asked when an instance is created on it; container names = a short name per hostname (default its first part) +
+  the path.
 - 2026-09-27 (phase 4 A): `fqdn` renamed `default_hostname`; any hostname whose DNS points here is allowed (no base domains;
   replaces "subdomains of the fqdn only"); a certificate email per hostname, defaulting to the server's email.
 - 2026-09-27 (phase 4 A): Munin's address is a setting (`munin_hostname`, default the `fqdn`), not tied to the main domain.
