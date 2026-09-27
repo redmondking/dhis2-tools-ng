@@ -461,8 +461,14 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
   - One version at a time until `1.0.0`: the next version's branch starts from `master` after the previous release.
   - Release candidates are tagged on the release branch (`v0.2.0-rc.1`); when one passes, that commit gets the release tag and
     `master` fast-forwards to it, so what was tested is exactly what is released.
-  - Urgent fixes to a released version: a short-lived `hotfix/<x.y.z>` branch from that release's tag; the fix is released from
-    it and merged back into the work branch.
+  - Urgent fixes (agreed 2026-09-27): **only the newest release gets fixes**; a server on an older version gets them by updating.
+    (Fixing the previous major version for a while after a new major is a decision for after `1.0.0`.) A fix is made on a
+    short-lived `hotfix/<x.y.z>` branch started **from the release's tag** (`git switch -c hotfix/0.3.1 v0.3.0`), tested (an
+    `-rc` on the test server if not trivial), tagged, `master` fast-forwards to it, and it is merged into the current release branch.
+  - Finished branches: once a release is tagged and `master` has moved, its `release/` branch is deleted, and so is a `hotfix/`
+    branch once released and merged back. The tag keeps the exact code; history is in `master`. The next version's branch starts
+    from `master`. Deleting on GitHub is pushing, so it is left to the user; `tools/release.sh` prints the commands.
+  - **Tags are never deleted or moved**: a release tag must always mean the same code (`--version` depends on it).
 
 ## 13. Management app and automation
 
@@ -511,6 +517,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
   phase 3c for the rest.
+- 2026-09-27: fixes only for the newest release, on `hotfix/` branches from the release tag; finished branches deleted, tags kept
+  for ever and never moved.
 - 2026-09-27: branches: `release/<x.y.z>` per version (develop renamed `release/0.1.0`), one version at a time until 1.0.0,
   `master` = released code only, `develop` channel dropped.
 - 2026-09-27: `--version` on every command; `VERSION` + `INSTALL.json` on servers; `--check` shows release notes (also in JSON).

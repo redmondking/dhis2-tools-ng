@@ -220,7 +220,8 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
       `/opt/dhis2-tools/VERSION` (release number) + `INSTALL.json` (version, channel, commit, time); `-dev+<commit>` when installed from a release branch;
       `dhis2-tools-update --check` (and `--json`) shows the release notes since the installed version
 - [ ] V.4 Branches: `release/<x.y.z>` per version, rc tags on it, `master` fast-forwards on release (`architecture.md` 12a);
-      hotfix details and what happens to finished branches: being settled
+      hotfixes only for the newest release, from its tag; finished branches deleted, tags never deleted or moved;
+      `RELEASING.md` and `tools/release.sh` cover all of it
 - [ ] V.5 (found 2026-09-27) `install.sh`: branch names now contain `/` (`release/0.1.0`); check the GitHub API request
       `commits/$BRANCH` works with them (URL-encode `/` as `%2F` if not)
 - Milestones: phases 0–3b tested → `0.1.0`; 3c → `0.2.0`; 4 → `0.3.0`; … `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`
