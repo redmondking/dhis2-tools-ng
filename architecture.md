@@ -181,7 +181,9 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
   small command. `/munin` is reserved only on that hostname. Existing servers keep Munin at `<fqdn>/munin`.
 - `default_hostname` can be any full hostname, including a subdomain (e.g. `hivtracker.example.com`).
 - Path: unique **within a hostname**, so `hmis.example.com/hmis` and `hmis2.example.com/hmis` can both exist.
-  Allowed characters: `[a-z0-9_-]`. `/munin` is reserved on Munin's hostname (see below), and so is `/<other path>-glowroot`. No instance at `/`.
+  Paths (agreed 2026-09-27, phase 4 section B): lowercase letters, digits and `-` only, 1–40 characters, not starting or ending
+  with `-` (no `_`: container names can't hold it). Uppercase is refused, not changed. Hostnames are stored in lowercase.
+  `/munin` is reserved on Munin's hostname (see below), and so is `/<other path>-glowroot`. No instance *at* `/`.
 - Container name defaults to `<subdomain>-<path>` (`hmis2.example.com/hmis` → `hmis2-hmis`); the user can override it.
   It is also the database name and role, so scripts must quote it in SQL (`-` is not valid unquoted).
 - Tomcat context = path (war unzipped to `webapps/<path>`), so the proxy never rewrites paths. Glowroot at `/<path>-glowroot`.
@@ -189,7 +191,10 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
   Flags `-H <hostname>`, `-p <path>`, both required with `-y`.
 - New subdomain: check that DNS resolves to this server; on failure stop, explain what to check, and offer to retry
   (without a terminal: exit 1). Then its own nginx server block and certificate, asking about auto-renewal.
-- The hostname root (`https://<hostname>/`) always shows a list of links to its instances.
+- The hostname root (`https://<hostname>/`), chosen per hostname (agreed 2026-09-27, phase 4 section B): **a list of links to
+  its instances**, or **a redirect to one of its instances** (`https://<hostname>/` → `/<path>/`; the instance stays at its
+  path, so Tomcat and DHIS2 don't change). Asked when the hostname is added (`--root list|<instance>`), changeable later. If the
+  chosen instance is deleted or moved away, the root falls back to the list.
 - Deleting the last instance on a subdomain asks whether to remove the subdomain's proxy config and certificate
   (`--remove-hostname yes|no`). The fqdn is never removed.
 - `dhis2-move-instance <name> -H <hostname> [-p <path>]` moves an instance to another hostname and/or path.
@@ -374,6 +379,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   and deploy-war, the security fixes (logview, ssl-setup), then the rest, one commit per command.
 - 2026-09-27: nginx only re-confirmed (the user asked whether forcing nginx is a problem for organisations using apache; the proxy
   is a container these tools manage, and supporting both would double every proxy feature).
+- 2026-09-27 (phase 4 B): paths `[a-z0-9-]`, 1–40 characters; each hostname's root is a list page or a redirect to a chosen
+  instance.
 - 2026-09-27 (phase 4 A): `fqdn` renamed `default_hostname`; any hostname whose DNS points here is allowed (no base domains;
   replaces "subdomains of the fqdn only"); a certificate email per hostname, defaulting to the server's email.
 - 2026-09-27 (phase 4 A): Munin's address is a setting (`munin_hostname`, default the `fqdn`), not tied to the main domain.
