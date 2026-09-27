@@ -283,7 +283,7 @@ Rules: `architecture.md`, Command rules. Audit done 2026-09-26. New commands fol
      line-set difference against the old templates), 15 rename
   8. 4.17: apache keeps the old way in `create/delete/deploy/list/logs` (`apache_add_instance`/`apache_remove_instance`); the rest refuses
   9. docs: `[0.3.0]` marks removed, old-name map dropped, `CHANGELOG.md`, README, 1.3 test list
-- [ ] 4.1 nginx layout with one server block per hostname. Existing upstream files keep working under the fqdn
+- [ ] 4.1 nginx layout with one server block per hostname, built by `proxy_build` (existing servers move to it with 4.14)
 - [ ] 4.2 Each hostname's root: a list page of its instances (regenerated whenever instances change) or a redirect to a chosen instance (`architecture.md`, Instances / Hostnames and certificates)
 - [ ] 4.3 DNS check for a new hostname against `public_ip` (new setting, suggested by the wizard from an outside lookup): on failure,
       explain what to check and offer retry / `--wait-dns` / cancel (without a terminal: exit 1, `dns_not_pointing_here`)
