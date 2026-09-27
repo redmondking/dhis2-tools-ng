@@ -166,8 +166,14 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
 
 - Hostnames: the `fqdn` from `containers.json`, plus any number of **subdomains of the fqdn only**.
   (Open for the phase 4 discussion, raised 2026-09-27: several base domains per server, each with its own subdomains.)
+- **Munin's address** (agreed 2026-09-27, phase 4 section A): a setting, `munin_hostname` in `containers.json`, defaulting to
+  the `fqdn`, with Munin at `https://<munin_hostname>/munin`. It can be a hostname of its own (e.g. `monitor.example.com`, with
+  its own certificate) so server-wide monitoring doesn't sit on one organisation's domain, and it can be moved later with a
+  small command. `/munin` is reserved only on that hostname. Existing servers keep Munin at `<fqdn>/munin`.
+- The `fqdn` can be any full hostname, including a subdomain (e.g. `hivtracker.example.com`); with several hostnames it is
+  the default hostname for new instances.
 - Path: unique **within a hostname**, so `hmis.example.com/hmis` and `hmis2.example.com/hmis` can both exist.
-  Allowed characters: `[a-z0-9_-]`. `/munin` is reserved on the fqdn, and so is `/<other path>-glowroot`. No instance at `/`.
+  Allowed characters: `[a-z0-9_-]`. `/munin` is reserved on Munin's hostname (see below), and so is `/<other path>-glowroot`. No instance at `/`.
 - Container name defaults to `<subdomain>-<path>` (`hmis2.example.com/hmis` → `hmis2-hmis`); the user can override it.
   It is also the database name and role, so scripts must quote it in SQL (`-` is not valid unquoted).
 - Tomcat context = path (war unzipped to `webapps/<path>`), so the proxy never rewrites paths. Glowroot at `/<path>-glowroot`.
@@ -360,6 +366,7 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   and deploy-war, the security fixes (logview, ssl-setup), then the rest, one commit per command.
 - 2026-09-27: nginx only re-confirmed (the user asked whether forcing nginx is a problem for organisations using apache; the proxy
   is a container these tools manage, and supporting both would double every proxy feature).
+- 2026-09-27 (phase 4 A): Munin's address is a setting (`munin_hostname`, default the `fqdn`), not tied to the main domain.
 - 2026-09-27: certificate failure handling (pre-flight checks with an automatic staging test, plain reasons, retry limits and
   `--wait-dns`, `dhis2-ssl-status` for renewals, `--json`), built in phase 4.
 - 2026-09-27: certificates via certbot webroot (the proxy never stops); `dhis2-ssl-setup` only switches to https once the
