@@ -41,7 +41,7 @@ Real tests are only done on the test server, never on the development machine. L
     large or unclear once work starts, stop and plan it on its own before continuing.
 3.  **Implement:** Follow sections 5 and 6.
 4.  **Check:** Run the local checks in section 3 and fix what they find before moving on.
-5.  **Record:** Update `tasks.md`, and `architecture.md` (including its decisions log) if a decision changed, in the same commit.
+5.  **Record:** Update `tasks.md`, and `architecture.md` if a decision changed (section "Updating architecture.md"), in the same commit.
     Add anything that needs a real server to check to task 1.3. Then mark the task `[~]`.
 6.  **Approve:** The user approves a whole phase, not single tasks. When the user says a phase is tested and approved,
     mark all of its `[~]` tasks `[x]` in one commit. Never mark anything `[x]` without that approval.
@@ -52,6 +52,15 @@ Real tests are only done on the test server, never on the development machine. L
 *   Commit messages carry no Claude attribution and no `Co-Authored-By` footers.
 *   Fix only what the task says. A bug found on the way becomes a new line in `tasks.md`.
 *   Secrets never go in code, `tasks.md`, `architecture.md`, commits or chat.
+
+### Updating architecture.md
+*   It describes the **current design only**: what the tools do and the rules they follow. No history, no dates, no "agreed on",
+    "changed from" or reasons for past choices (git history keeps those), and no decisions log.
+*   When a decision is made or changed, **edit the section it belongs to**: replace the old text, don't add a new paragraph
+    next to it. One area per section; short rules, lists and tables rather than prose.
+*   Mark parts that aren't built yet with the version they come in, e.g. `[0.3.0]`; remove the mark once built.
+*   Keep it lean: if a section grows, tighten it. Details of how something is implemented belong in the code or `tasks.md`.
+*   After every edit, check that no section or rule went missing.
 
 ### Editing Files
 *   Use replacements that fail when the expected text is not found. After editing a doc, check that no section went missing.
