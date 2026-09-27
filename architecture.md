@@ -209,8 +209,9 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
     It must be unique on the server, so instance names can't clash.
   - The suggested container name is `<short name>-<path>`; the user can type another (`--name` for automation).
   - Existing servers: `default_hostname` gets a short name (its first part); existing instances keep their names.
-- Deleting the last instance on a subdomain asks whether to remove the subdomain's proxy config and certificate
-  (`--remove-hostname yes|no`). The fqdn is never removed.
+- Deleting the last instance on a hostname asks whether to remove the hostname too (its nginx config, settings and
+  certificate), with **no default** (agreed 2026-09-27): the admin must answer; without a terminal `--remove-hostname yes|no`
+  is required (exit 3 if missing). Never asked for `default_hostname`, which is never removed.
 - **`dhis2-instance`** (agreed 2026-09-27, built in phase 4): one command for everything done *to* an instance, like
   `dhis2-hostname`, replacing `dhis2-create-instance`, `dhis2-delete-instance`, `dhis2-deploy-war`, `dhis2-list-instances` and
   the planned move/describe commands:
@@ -222,6 +223,8 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
     (`/usr/local/etc/dhis/old-scripts`) and prints the new commands, so no stale original can be run by mistake.
   - Logs, monitoring and backups stay separate commands.
 - Moving an instance to another hostname and/or path: `dhis2-instance edit <name> --hostname <h> [--path <p>]`.
+  Moving to **another hostname renames the instance** (agreed 2026-09-27) to fit the new hostname (`<new short name>-<path>`,
+  asked with that default; `--name`). The details of a move are being discussed (phase 4 section F).
 - **Proxy layout** (agreed 2026-09-27, phase 4 section C):
   - Each hostname has a settings file on the host, `/usr/local/etc/dhis/hostnames/<hostname>.json` (short name, certificate
     email/account, what the root shows). With the instances' labels (hostname, path, description) that is everything needed
@@ -560,6 +563,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   pushes; `RELEASING.md`.
 - 2026-09-27: the tools get versions: semantic versioning, flags and JSON output count as the interface, release candidates
   (`-rc.N`) before releases, first public release `1.0.0`.
+- 2026-09-27 (phase 4 F): "remove the hostname too?" on its last instance has no default; moving to another hostname renames
+  the instance.
 - 2026-09-27 (phase 4 E): the order of `dhis2-instance create`'s questions; instance IPs `.10`–`.19` then `.100`–`.249`.
 - 2026-09-27 (phase 4 D): `public_ip` setting for DNS checks; certificates Let's Encrypt (default) / own / none; a failed
   certificate leaves the hostname "http only, certificate pending", finished later with `dhis2-ssl-setup --hostname`.
