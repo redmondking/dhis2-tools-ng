@@ -217,7 +217,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] V.2 `install.sh` / `dhis2-tools-update`: channels `stable` (default) / `rc` (remembered per server, `--channel`),
       `--version <x.y.z>` (older refused unless `--force`), `--allow-major` for major updates even with `-y`
 - [ ] V.3 `--version` on every command (shared helpers); the tools version in every `--json` answer and run log;
-      `/opt/dhis2-tools/VERSION` (release number) + `INSTALL.json` (version, channel, commit, time); `-dev+<commit>` on develop;
+      `/opt/dhis2-tools/VERSION` (release number) + `INSTALL.json` (version, channel, commit, time); `-dev+<commit>` when installed from a release branch;
       `dhis2-tools-update --check` (and `--json`) shows the release notes since the installed version
 - [ ] V.4 Branches: `release/<x.y.z>` per version, rc tags on it, `master` fast-forwards on release (`architecture.md` 12a);
       hotfix details and what happens to finished branches: being settled
