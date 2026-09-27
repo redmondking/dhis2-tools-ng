@@ -253,9 +253,11 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   `--root this|list|keep`, `--email` for a new hostname's certificate
 - [ ] 4.6 Quote instance names in all SQL, since names can contain `-`
 - [ ] 4.7 `dhis2-delete-instance` (`--remove-hostname yes|no` for automation): remove the instance from its hostname. If it was the last one there, offer to remove the subdomain (never the fqdn)
-- [ ] 4.8 `dhis2-move-instance <name> -H <hostname> [-p <path>]`: summary, `-y`, `--dry-run`
+- [ ] 4.8 `dhis2-instance edit <name>`: `--hostname`, `--path`, `--description`/`--clear-description`; summary, `-y`, `--dry-run`
 - [ ] 4.9 Glowroot at `/<path>-glowroot`
-- [ ] 4.11 `dhis2-describe-instance <instance> "<text>"` (`--clear`): set the description shown on the list page, rebuild that page
+- [ ] 4.11 One `dhis2-instance` command (`architecture.md` section 7): dispatcher + `setup/service/instance/{create,delete,edit,deploy,list}`,
+      replacing `dhis2-create-instance`, `dhis2-delete-instance`, `dhis2-deploy-war`, `dhis2-list-instances` (no links under the old names)
+- [ ] 4.12 `dhis2-upgrade-setup`: move copies of the retired command names aside on existing servers and print the new commands
 
 ## Phase 5 – Interactive setup and instance creation
 

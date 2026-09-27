@@ -156,7 +156,7 @@ All state about an instance lives on its container:
 | `user.dhis2.backup` | `plain` / `encrypted` / `no` | [planned, phase 6] create-instance |
 | `user.dhis2.postgres` | the postgres container holding its database | [planned, phase 6] create-instance |
 | `user.dhis2.hostname`, `user.dhis2.path` | [planned, phase 4] | create-instance, `dhis2-move-instance` |
-| `user.dhis2.description` | shown on the hostname's list page, e.g. `Production` [planned, phase 4] | create-instance, `dhis2-describe-instance` |
+| `user.dhis2.description` | shown on the hostname's list page, e.g. `Production` [planned, phase 4] | `dhis2-instance create` / `edit` |
 
 Instances made by older versions are labelled by `dhis2-upgrade-setup` (version from the deployed war's `dhis-api-*.jar`).
 `dhis2-list-instances` [built] shows them: name, version, URL, Tomcat, Java, IP, status, Glowroot, Munin; `--json`.
@@ -211,7 +211,17 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
   - Existing servers: `default_hostname` gets a short name (its first part); existing instances keep their names.
 - Deleting the last instance on a subdomain asks whether to remove the subdomain's proxy config and certificate
   (`--remove-hostname yes|no`). The fqdn is never removed.
-- `dhis2-move-instance <name> -H <hostname> [-p <path>]` moves an instance to another hostname and/or path.
+- **`dhis2-instance`** (agreed 2026-09-27, built in phase 4): one command for everything done *to* an instance, like
+  `dhis2-hostname`, replacing `dhis2-create-instance`, `dhis2-delete-instance`, `dhis2-deploy-war`, `dhis2-list-instances` and
+  the planned move/describe commands:
+  - `create`, `delete`, `edit` (hostname, path, description; later Glowroot/Munin on or off), `deploy`, `list`
+  - a small dispatcher; each action stays in its own file (`setup/service/instance/<action>`), so no single huge script
+  - shared options (`-y`, `--dry-run`, `--json`, `--json-stream`, `--detach`) handled once
+  - **no links under the old names** (the tools haven't been launched, so nothing depends on them). Existing servers still
+    have copies of the original scripts in `/usr/local/bin`: `dhis2-upgrade-setup` moves those retired names aside
+    (`/usr/local/etc/dhis/old-scripts`) and prints the new commands, so no stale original can be run by mistake.
+  - Logs, monitoring and backups stay separate commands.
+- Moving an instance to another hostname and/or path: `dhis2-instance edit <name> --hostname <h> [--path <p>]`.
 - **Proxy layout** (agreed 2026-09-27, phase 4 section C):
   - Each hostname has a settings file on the host, `/usr/local/etc/dhis/hostnames/<hostname>.json` (short name, certificate
     email/account, what the root shows). With the instances' labels (hostname, path, description) that is everything needed
@@ -226,7 +236,7 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
   - The list page: the hostname as title and a link per instance (`/prod`) with its **description** (e.g. "Production"),
     no DHIS2 versions or other details (the page is public). Descriptions are HTML-escaped. The description is a label on
     the instance (`user.dhis2.description`), asked when it is created (`--description`, optional), and changed later with
-    `dhis2-describe-instance <instance> "<text>"` (`--clear` to remove), which rebuilds that hostname's list page.
+    `dhis2-instance edit <instance> --description "<text>"` (`--clear-description`), which rebuilds that hostname's list page.
   - The root redirect is temporary (302), so a change takes effect at once for everyone.
 - **`dhis2-hostname`** (agreed 2026-09-27), with the usual `-y`, `--dry-run`, `-h`:
   - `add <hostname>`: DNS check (retry), short name, certificate email, certificate (section D), nginx config; root starts as the
@@ -445,6 +455,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
   phase 3c for the rest.
+- 2026-09-27 (phase 4 C): one `dhis2-instance` command (create, delete, edit, deploy, list; separate files inside), no links
+  under the old names; `dhis2-upgrade-setup` retires the original copies on existing servers.
 - 2026-09-27 (phase 4 C): hostname settings files, proxy config always rebuilt from settings; list page with a description
   per instance; 302 root redirect.
 - 2026-09-27: live results on every command: `--json-stream` (JSON Lines), run log files, `--detach` + `dhis2-run`; built in 3c.
