@@ -142,6 +142,7 @@ Instances made by older versions are labelled by `dhis2-upgrade-setup` (version 
 An instance's address is `https://<hostname>/<path>`. The container name is separate.
 
 - Hostnames: the `fqdn` from `containers.json`, plus any number of **subdomains of the fqdn only**.
+  (Open for the phase 4 discussion, raised 2026-09-27: several base domains per server, each with its own subdomains.)
 - Path: unique **within a hostname**, so `hmis.example.com/hmis` and `hmis2.example.com/hmis` can both exist.
   Allowed characters: `[a-z0-9_-]`. `/munin` is reserved on the fqdn, and so is `/<other path>-glowroot`. No instance at `/`.
 - Container name defaults to `<subdomain>-<path>` (`hmis2.example.com/hmis` → `hmis2-hmis`); the user can override it.
