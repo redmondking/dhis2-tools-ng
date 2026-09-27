@@ -223,8 +223,13 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
     (`/usr/local/etc/dhis/old-scripts`) and prints the new commands, so no stale original can be run by mistake.
   - Logs, monitoring and backups stay separate commands.
 - Moving an instance to another hostname and/or path: `dhis2-instance edit <name> --hostname <h> [--path <p>]`.
-  Moving to **another hostname renames the instance** (agreed 2026-09-27) to fit the new hostname (`<new short name>-<path>`,
-  asked with that default; `--name`). The details of a move are being discussed (phase 4 section F).
+  A move **renames the instance** to fit its new address (`<short name>-<path>`, asked with that default; `--name`), whether the
+  hostname changes or only the path (agreed 2026-09-27). The move renames the container, database, database user, labels, hosts
+  line, Munin node and backup folder; DHIS2 is down for a few minutes; a failed step undoes the earlier ones.
+  - The old address: the move asks whether to **redirect** it to the new one, explaining what that means in practice (it keeps
+    bookmarks and old links working in browsers; the DHIS2 Android app and integrations must be reconfigured either way; while
+    the redirect exists the old path stays taken). **No**: the old path is removed at once. **Yes**: a redirect (307, keeping
+    the rest of the address) stays until removed with a `dhis2-hostname` command. `--redirect yes|no` for automation.
 - **Proxy layout** (agreed 2026-09-27, phase 4 section C):
   - Each hostname has a settings file on the host, `/usr/local/etc/dhis/hostnames/<hostname>.json` (short name, certificate
     email/account, what the root shows). With the instances' labels (hostname, path, description) that is everything needed
@@ -563,6 +568,7 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   pushes; `RELEASING.md`.
 - 2026-09-27: the tools get versions: semantic versioning, flags and JSON output count as the interface, release candidates
   (`-rc.N`) before releases, first public release `1.0.0`.
+- 2026-09-27 (phase 4 F): a move renames the instance (also for a path change); the old address redirect is asked each move.
 - 2026-09-27 (phase 4 F): "remove the hostname too?" on its last instance has no default; moving to another hostname renames
   the instance.
 - 2026-09-27 (phase 4 E): the order of `dhis2-instance create`'s questions; instance IPs `.10`–`.19` then `.100`–`.249`.
