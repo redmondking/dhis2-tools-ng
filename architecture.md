@@ -69,8 +69,11 @@ Admins use `dhis2-*` commands on the host. Later a Nuxt management app and Ansib
   support is deleted once that is tested.
 - One shared PostgreSQL 16 container for all instances. The DHIS2 docs require ≥9.6 for 2.38/2.39 and recommend 14, but say
   nothing about 16, so 2.38 on 16 is on the test list. If it fails, a second postgres container on 14 for old versions.
-- Certificates (agreed 2026-09-27): certbot in **webroot** mode, from the apt `certbot` package; no nginx plugin, no standalone.
-  - The proxy serves `/.well-known/acme-challenge/` from `/var/www/letsencrypt`; certbot writes its check file there, so the
+- Certificates (agreed 2026-09-27, nginx): certbot in **webroot** mode, from the apt `certbot` package; no nginx plugin, no standalone.
+  Apache servers keep standalone with stop/start hooks until phase 8 moves them to nginx.
+  - The proxy serves `/.well-known/acme-challenge/` from `/var/www/letsencrypt` (`configs/nginx-acme-challenge.conf`, installed as
+    `/etc/nginx/snippets/acme-challenge.conf` and included in every port-80 server block; the http→https redirect uses
+    `location / { return 301 … }` so the check isn't redirected); certbot writes its check file there, so the
     proxy **never stops**, neither when a certificate is issued nor at renewals.
   - A deploy hook reloads the proxy after a renewal, so it picks up the new certificate without interrupting anyone.
   - `dhis2-ssl-setup` gets the certificate first. Only when certbot succeeded and the certificate files exist does it write
@@ -343,6 +346,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
 - 2026-09-26 (phase 3b): create-only asks the version line (`--line`); `dhis2-restoredb` stops the instance's Tomcat, restores and
   starts it again when the database belongs to an instance; every short flag gets a long name; 3b order: helpers, create-instance
   and deploy-war, the security fixes (logview, ssl-setup), then the rest, one commit per command.
+- 2026-09-27: nginx only re-confirmed (the user asked whether forcing nginx is a problem for organisations using apache; the proxy
+  is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: certificates via certbot webroot (the proxy never stops); `dhis2-ssl-setup` only switches to https once the
   certificate exists and the new config passes its test, otherwise the old config stays (3b.17).
 - 2026-09-26: `dhis2-backup` reads how from `dhis2-env`, what from instance labels (`user.dhis2.backup`, `user.dhis2.postgres`),

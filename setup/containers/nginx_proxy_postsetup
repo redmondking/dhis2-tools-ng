@@ -2,6 +2,10 @@
 lxc exec $NAME -- mkdir -p /etc/nginx/upstream
 lxc exec $NAME -- mkdir -p /etc/nginx/conf.d
 
+# Let's Encrypt challenge folder and location (certbot --webroot), so the proxy never stops for certbot
+lxc exec $NAME -- mkdir -p /var/www/letsencrypt /etc/nginx/snippets
+lxc file push configs/nginx-acme-challenge.conf $NAME/etc/nginx/snippets/acme-challenge.conf
+
 # Replace placeholder values in template conf
 cat configs/nginx-dhis2.conf |sed "s/FQDN/${FQDN}/" > /tmp/nginx.conf
 

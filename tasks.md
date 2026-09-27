@@ -85,6 +85,9 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
       exit non-zero and still start tomcat
     - `dhis2-delete-instance --dry-run`, then a real delete; `dhis2-delete-instance postgres` must refuse
     - `dhis2-ssl-setup --dry-run` (staging test), then a real run; without a terminal and without `-y` it must stop (exit 3)
+    - 3b.17: during `dhis2-ssl-setup`, a loop of `curl` requests shows no failed request (nginx never stops); `certbot renew --dry-run`
+      works; with DNS not pointing at the server the site stays up on http and the command exits 1; the rendered https
+      `nginx.conf` passes `nginx -t` and `http://<fqdn>/.well-known/acme-challenge/x` is not redirected
     - `dhis2-logview`: `-f`, `-r`, `-g` with quotes and `;` in the text (must only search), `-S`/`-U`, `-n`, `--json` on Tomcat 9 and 10
 - [ ] 1.4 Merge `develop` into `master` and push
 
