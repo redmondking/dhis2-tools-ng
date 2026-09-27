@@ -238,6 +238,20 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
     the instance (`user.dhis2.description`), asked when it is created (`--description`, optional), and changed later with
     `dhis2-instance edit <instance> --description "<text>"` (`--clear-description`), which rebuilds that hostname's list page.
   - The root redirect is temporary (302), so a change takes effect at once for everyone.
+- **Creating an instance** (agreed 2026-09-27, phase 4 section E), `dhis2-instance create`, interactive order:
+  1. hostname: menu of existing hostnames (with their paths and certificate status) + "a new hostname" (the section D steps);
+     default `default_hostname`; a hostname whose certificate is pending gets a plain-http warning
+  2. path (rules above, unique on that hostname)
+  3. container name `[<short name>-<path>]`
+  4. description (optional)
+  5. create and deploy, or create only; source and release (section 5)
+  6. Glowroot, Munin
+  7. what the hostname's root shows (above)
+  8. summary → "Create it?"
+  (Phases 5 and 6 add the admin login, memory and backup questions.)
+  - All SQL quotes the instance name (`"hmis-prod"`), since names can contain `-`.
+  - Automatic IPs: the free ones left in `.10`–`.19` first (existing servers keep their addresses), then `.100`–`.249`
+    (150 more; the proxy is `.2`, postgres `.20`, Munin `.30`). `--ip` sets one by hand.
 - **Adding a hostname** (agreed 2026-09-27, phase 4 section D), `dhis2-hostname add` or "a new hostname" in `dhis2-instance create`:
   1. the hostname looks valid and isn't on this server yet
   2. short name (default: its first part) and certificate email (default: the server's email)
@@ -546,6 +560,7 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   pushes; `RELEASING.md`.
 - 2026-09-27: the tools get versions: semantic versioning, flags and JSON output count as the interface, release candidates
   (`-rc.N`) before releases, first public release `1.0.0`.
+- 2026-09-27 (phase 4 E): the order of `dhis2-instance create`'s questions; instance IPs `.10`–`.19` then `.100`–`.249`.
 - 2026-09-27 (phase 4 D): `public_ip` setting for DNS checks; certificates Let's Encrypt (default) / own / none; a failed
   certificate leaves the hostname "http only, certificate pending", finished later with `dhis2-ssl-setup --hostname`.
 - 2026-09-27 (phase 4 C): one `dhis2-instance` command (create, delete, edit, deploy, list; separate files inside), no links

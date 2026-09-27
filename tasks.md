@@ -289,6 +289,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   Flags: `-H <hostname>`, `-p <path>` (both required with `-y`), `--short-name`, `--name` (default `<short name>-<path>`),
   `--root this|list|keep`, `--email` for a new hostname's certificate
 - [ ] 4.6 Quote instance names in all SQL, since names can contain `-`
+- [ ] 4.6a Automatic instance IPs: free ones in `.10`–`.19` first, then `.100`–`.249` (`architecture.md` section 7)
 - [ ] 4.7 `dhis2-delete-instance` (`--remove-hostname yes|no` for automation): remove the instance from its hostname. If it was the last one there, offer to remove the subdomain (never the fqdn)
 - [ ] 4.8 `dhis2-instance edit <name>`: `--hostname`, `--path`, `--description`/`--clear-description`; summary, `-y`, `--dry-run`
 - [ ] 4.9 Glowroot at `/<path>-glowroot`
