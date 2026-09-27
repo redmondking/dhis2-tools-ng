@@ -381,6 +381,24 @@ Background: the original setup gave Glowroot's `anonymous` user the Administrato
 - The admin login step is skipped.
 - Automation: `--restore <file>`, `--restore-files yes|no`, `--backup-password-file <path>`.
 
+## 11a. Commands  [0.3.0]
+
+Six commands, each `<command> <action> [options]`, each action in its own file inside:
+
+| Command | Actions |
+|---|---|
+| `dhis2-instance` | `create`, `delete`, `edit`, `deploy`, `list`, `logs`; later `upgrade` (phase 9) |
+| `dhis2-hostname` | `add`, `list`, `set-root`, `set-munin`, `remove`, `rebuild`, `cert` (get / retry / replace a certificate, `--own` files), `certs` (expiry and last renewal of all) |
+| `dhis2-backup` | `run` (the nightly job), `list`, `restore`, `remote add\|list\|test\|sync\|remove` |
+| `dhis2-monitoring` | `glowroot [instance]` (set a Glowroot login), `munin` (set the Munin login) |
+| `dhis2-server` | `setup` (the wizard), `update` (new tools: `--check`, `--rollback`, `--version`, `--channel`), `db-activity`, and the step that brings the server's setup up to the installed tools (name pending: `migrate` proposed; `repair` is kept for real repairs) |
+| `dhis2-run` | `follow`, `status`, `list` |
+
+- `install.sh` stays separate: the one-line bootstrap before any command exists.
+- `dhis2-tomcat-munin` becomes internal (`dhis2-instance edit --munin yes`).
+- Replaces the old names (`dhis2-create-instance`, `dhis2-ssl-setup`, `dhis2-upgrade-setup`, …); the server-setup step retires
+  them on existing servers.
+
 ## 12. Command and flag rules (every `dhis2-*` command)
 
 Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new commands follow them from the start.
