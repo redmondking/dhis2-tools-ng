@@ -30,7 +30,8 @@ Real tests are only done on the test server, never on the development machine. L
 ## 4. Workflow
 
 *   **Tasks and phases:** A task is one numbered line in `tasks.md` (e.g. 3.1). A phase is a group of tasks (e.g. phase 3).
-*   **Branches:** Work on `develop`. `master` stays at the original code (`a37e7db`) until testing passes.
+*   **Branches:** Work on the branch of the version being built, `release/<version>` (now `release/0.1.0`). `master` holds
+    released code only, and stays at the original code (`a37e7db`) until `0.1.0` is released. See `architecture.md` section 12a.
 *   **Merging:** Merge `develop` into `master` only after asking the user and getting a yes in chat. Pushing any branch,
     force-pushing and rebasing are left to the user.
 

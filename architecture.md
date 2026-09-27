@@ -435,9 +435,10 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
     server, then `1.0.0`.
   - After `1.0.0`: phase 7 (create from a backup), phase 9 (DHIS2 upgrades) and phase 10 (docs, whiptail) as `1.x` releases.
 - **What servers install** (agreed, R3). This replaces "updates follow `master`" (section 3):
-  - Channels, chosen per server and remembered: `stable` (default: the newest release), `rc` (the newest release or release
-    candidate: the test server, early testers), `develop` (the newest commit on `develop`: development only; replaces the
-    `DHIS2_TOOLS_BRANCH` testing override). `install.sh --channel <name>`; `dhis2-tools-update --channel <name>` switches it.
+  - Channels, chosen per server and remembered: `stable` (default: the newest release) and `rc` (the newest release or release
+    candidate: the test server, early testers). `install.sh --channel <name>`; `dhis2-tools-update --channel <name>` switches it.
+    (A `develop` channel was dropped on 2026-09-27 with the `develop` branch; the `DHIS2_TOOLS_BRANCH` testing override stays
+    for testing unreleased work on a release branch.)
   - `dhis2-tools-update --version <x.y.z>` installs exactly that release. An older version than the installed one is refused
     unless `--force` (with a warning: `dhis2-upgrade-setup` only migrates forward). `--rollback` stays for emergencies.
   - A major update (e.g. `1.x` → `2.0.0`) is never silent: even with `-y` it needs `--allow-major`, otherwise it stops and
@@ -447,15 +448,19 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
   - Every command answers `--version` (`dhis2-tools 1.2.0 (stable)`), from the shared helpers; every `--json` answer and every
     run log includes the tools version.
   - On the server: `/opt/dhis2-tools/VERSION` holds the release number (e.g. `1.2.0`); `/opt/dhis2-tools/INSTALL.json` holds
-    version, channel, commit and install time. On `develop`, the repo's `VERSION` names the next version with `-dev`
-    (e.g. `1.3.0-dev`) and the server shows `1.3.0-dev+<short commit>`.
+    version, channel, commit and install time. On a release branch, the repo's `VERSION` names the version being built with
+    `-dev` (e.g. `1.3.0-dev`); a server installed from it for testing shows `1.3.0-dev+<short commit>`.
   - `dhis2-tools-update --check` shows the installed version and channel, the newest available, and the release notes of every
     release in between (from GitHub Releases); `--check --json` gives the same as `installed`, `channel`, `latest`,
     `update_available`, `major`, `releases: [{version, date, notes}]`.
 - **Branches** (R5, partly agreed):
   - `master` holds **released code only**: it moves only when a release is made (with the user's yes), so it always equals the
     newest release.
-  - Work moves from the single `develop` branch to **a branch per upcoming version** (naming and switch-over: being settled).
+  - Work happens on **a branch per upcoming version**, `release/<x.y.z>` (e.g. `release/0.2.0`). The former `develop` branch was
+    renamed `release/0.1.0` on 2026-09-27; there is no `develop` branch any more.
+  - One version at a time until `1.0.0`: the next version's branch starts from `master` after the previous release.
+  - Release candidates are tagged on the release branch (`v0.2.0-rc.1`); when one passes, that commit gets the release tag and
+    `master` fast-forwards to it, so what was tested is exactly what is released.
   - Urgent fixes to a released version: a short-lived `hotfix/<x.y.z>` branch from that release's tag; the fix is released from
     it and merged back into the work branch.
 
@@ -506,6 +511,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
   phase 3c for the rest.
+- 2026-09-27: branches: `release/<x.y.z>` per version (develop renamed `release/0.1.0`), one version at a time until 1.0.0,
+  `master` = released code only, `develop` channel dropped.
 - 2026-09-27: `--version` on every command; `VERSION` + `INSTALL.json` on servers; `--check` shows release notes (also in JSON).
 - 2026-09-27: channels stable / rc / develop; `--version`; `--allow-major` for major updates; no automatic updates yet.
 - 2026-09-27: `0.x` milestones before `1.0.0` (phases 0–3b = `0.1.0` once tested); `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`.

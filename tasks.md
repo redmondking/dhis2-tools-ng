@@ -7,7 +7,7 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 
 ## Where we are (2026-09-26)
 
-- Branch `develop`, nothing pushed. `master` is still the original code (`a37e7db`).
+- Branch `release/0.1.0` (renamed from `develop` on 2026-09-27), nothing pushed. `master` is still the original code (`a37e7db`).
 - Phases 0, 2, 3 and 3b are written and committed. Nothing has been tested on a real server yet: all `[~]`.
 - Command and flag rules agreed (`architecture.md` section 12). Every command was audited; the results are phase 3b
   (existing commands) and the automation notes in phases 4–9 (new commands).
@@ -214,12 +214,13 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 
 - [ ] V.1 `VERSION` at the repo root, `CHANGELOG.md` (with the work so far under "Unreleased", grouped Added / Changed / Fixed /
       Security / Upgrade notes), `RELEASING.md`, `tools/release.sh`
-- [ ] V.2 `install.sh` / `dhis2-tools-update`: channels `stable` (default) / `rc` / `develop` (remembered per server, `--channel`),
+- [ ] V.2 `install.sh` / `dhis2-tools-update`: channels `stable` (default) / `rc` (remembered per server, `--channel`),
       `--version <x.y.z>` (older refused unless `--force`), `--allow-major` for major updates even with `-y`
 - [ ] V.3 `--version` on every command (shared helpers); the tools version in every `--json` answer and run log;
       `/opt/dhis2-tools/VERSION` (release number) + `INSTALL.json` (version, channel, commit, time); `-dev+<commit>` on develop;
       `dhis2-tools-update --check` (and `--json`) shows the release notes since the installed version
-- [ ] V.4 Branches: discussion R5 still open
+- [ ] V.4 Branches: `release/<x.y.z>` per version, rc tags on it, `master` fast-forwards on release (`architecture.md` 12a);
+      hotfix details and what happens to finished branches: being settled
 - Milestones: phases 0–3b tested → `0.1.0`; 3c → `0.2.0`; 4 → `0.3.0`; … `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`
 
 ## Phase 3c – JSON answers from the commands phase 4 doesn't rework
