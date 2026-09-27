@@ -192,8 +192,11 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
   (without a terminal: exit 1). Then its own nginx server block and certificate, asking about auto-renewal.
 - The hostname root (`https://<hostname>/`), chosen per hostname (agreed 2026-09-27, phase 4 section B): **a list of links to
   its instances**, or **a redirect to one of its instances** (`https://<hostname>/` → `/<path>/`; the instance stays at its
-  path, so Tomcat and DHIS2 don't change). Changeable later with a command (section C). If the chosen instance is deleted or
-  moved away, the root falls back to the list.
+  path, so Tomcat and DHIS2 don't change). Changeable later with a command (section C).
+  - When the root's instance is deleted or moved away (agreed 2026-09-27): **ask** what the root shows afterwards, listing the
+    list page and every other instance on that hostname (default: the list). `--root list|<instance>` for automation; without
+    it, the list.
+  - Menus of instances show only that hostname's instances, numbered, and accept either the number or the path.
   - Asked **when an instance is created** on the hostname (a hostname has no instances before that):
     - first instance: "What should https://<hostname>/ show? 1) This instance 2) A list of its instances" (default 1)
     - later instances: "https://<hostname>/ currently opens /<path> (…) / shows a list. 1) Keep that 2) Open this new instance
