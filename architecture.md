@@ -350,7 +350,7 @@ through the API once DHIS2 is up. Keeping the defaults prints a warning. Skipped
 - **Semantic versioning** `MAJOR.MINOR.PATCH`: patch = fixes, minor = new features, major = something works differently. The
   flags and JSON output are the interface: changing or removing one means a major version; adding one, a minor.
 - `0.x` milestones until `1.0.0` (breaking changes allowed): 0.1.0 = phases 0–3b, then one minor per tested phase (see
-  `tasks.md`). `1.0.0` = phases 0–6 and 8. Phases 7, 9 and 10 follow in `1.x`.
+  `tasks.md`). `1.0.0` = phases 0–6 and 8, plus the docs rewrite. Phases 7 and 9, and whiptail prompts, follow in `1.x`.
 - Release candidates `x.y.z-rc.N` go to the test server (`rc` channel) before each release.
 - The version is in `VERSION` at the repo root (`x.y.z-dev` while being built; a test install shows `x.y.z-dev+<commit>`).
 - `CHANGELOG.md`: an "Unreleased" section kept up in the same commits as the work (Added / Changed / Fixed / Security /

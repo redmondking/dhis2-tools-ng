@@ -8,17 +8,17 @@ Status: `[ ]` todo, `[x]` done, `[~]` done but not tested on a real server.
 ## Versions
 
 Each version is a release branch `release/<version>` (`architecture.md`, Versions and releases). A version is released once its phases are
-tested on the test server and approved. `(proposed)` = waiting for the user's confirmation.
+tested on the test server and approved.
 
 | Version | Phases and tasks | State |
 |---|---|---|
-| **0.1.0** | 0, 2, 3, 3b; release files V.1 *(proposed)*; V.5; tested in phase 1 | written, untested; branch `release/0.1.0` |
+| **0.1.0** | 0, 2, 3, 3b; release files V.1; V.5; tested in phase 1 | written, untested; branch `release/0.1.0` |
 | **0.2.0** | 3c (JSON answers, live results, `dhis2-run`); V.2–V.4 (channels, versions shown, branches) | agreed, not built |
 | **0.3.0** | 4 (hostnames and paths, `dhis2-instance`, `dhis2-hostname`, certificate failure handling) | being discussed |
 | **0.4.0** | 5 (setup wizard, `--config`, admin login, memory) | agreed, not built |
 | **0.5.0** | 6 (backups, remotes, `dhis2-list-backups`) | agreed, not built |
 | **0.6.0** | 8 (bring existing servers forward) | agreed, not built |
-| **1.0.0** | release candidates of all the above; docs rewrite 10.1 *(proposed)* | |
+| **1.0.0** | release candidates of all the above; docs rewrite 10.1 | |
 | 1.1.0 | 7 (create an instance from a backup) | agreed, not built |
 | 1.2.0 | 9 (DHIS2 version upgrades) | to design |
 | later 1.x | 10.2 (whiptail), the "Later" list | |
@@ -459,7 +459,7 @@ Testing: connect ✓  write ✓  delete test file ✓
   - downtime warning and confirmation
 - [ ] 9.2 Build `dhis2-upgrade-instance`: `-V <release>`, summary, `-y`, `--dry-run`, backup first (default yes)
 
-## Phase 10 – Docs and polish  ·  10.1 in 1.0.0 (proposed), 10.2 later
+## Phase 10 – Docs and polish  ·  10.1 in 1.0.0, 10.2 later
 
 - [ ] 10.1 Rewrite `README.md` and `docs/`, which describe Ubuntu 18.04, PostgreSQL 10 and a 2.33 war
 - [ ] 10.2 Switch prompts to `whiptail` once everything above is tested
