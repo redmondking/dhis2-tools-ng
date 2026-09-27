@@ -408,6 +408,17 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
 
 **State**: all state lives on the server (labels `user.dhis2.*`, files in `/usr/local/etc/dhis`); re-running a command is safe.
 
+## 12a. Versions and releases of the tools  [being discussed 2026-09-27]
+
+- **Version numbers** (agreed, R1): semantic versioning, `MAJOR.MINOR.PATCH`:
+  - PATCH: fixes only; MINOR: new features, nothing existing breaks; MAJOR: something works differently and admins or
+    automation must adapt.
+  - The flags and the JSON output (section 12) are the interface: changing or removing a flag or a JSON field means a new
+    MAJOR version; adding one needs only a MINOR.
+  - The first public release is `1.0.0`, launched after testing on the test server. Test versions before a release are
+    release candidates: `1.0.0-rc.1`, `1.0.0-rc.2`, …
+  - The version is kept in one file in the repo (`VERSION` at the root, e.g. `1.0.0`), so the scripts can show it without git.
+
 ## 13. Management app and automation
 
 The user will build a Nuxt web app to manage servers (deploy instances on existing servers, manage backups, ...). It, and
@@ -455,6 +466,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
   phase 3c for the rest.
+- 2026-09-27: the tools get versions: semantic versioning, flags and JSON output count as the interface, release candidates
+  (`-rc.N`) before releases, first public release `1.0.0`.
 - 2026-09-27 (phase 4 C): one `dhis2-instance` command (create, delete, edit, deploy, list; separate files inside), no links
   under the old names; `dhis2-upgrade-setup` retires the original copies on existing servers.
 - 2026-09-27 (phase 4 C): hostname settings files, proxy config always rebuilt from settings; list page with a description
