@@ -242,8 +242,10 @@ Rules: `architecture.md`, Command rules. Audit done 2026-09-26. New commands fol
 - [ ] V.4 Branches: `release/<x.y.z>` per version, rc tags on it, `master` fast-forwards on release (`architecture.md` 12a);
       hotfixes only for the newest release, from its tag; finished branches deleted, tags never deleted or moved;
       `RELEASING.md` and `tools/release.sh` cover all of it
-- [ ] V.5 (found 2026-09-27) `install.sh`: branch names now contain `/` (`release/0.1.0`); check the GitHub API request
-      `commits/$BRANCH` works with them (URL-encode `/` as `%2F` if not)
+- [~] V.5 (found 2026-09-27) `install.sh`: branch names now contain `/` (`release/0.1.0`); check the GitHub API request
+      `commits/$BRANCH` works with them (URL-encode `/` as `%2F` if not). Checked against GitHub: `commits/<a/b>`, `%2F` and
+      `refs/heads/<a/b>` all answer the same sha (also with dots, e.g. `dependabot/.../x-2.11.21`); the tarball is fetched by
+      sha and the raw `install.sh` URL uses `refs/heads/`, so no change. Confirmed for real once `release/0.1.0` is pushed (1.3)
 - Milestones: phases 0–3b tested → `0.1.0`; 3c → `0.2.0`; 4 → `0.3.0`; … `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`
 
 ## Phase 3c – JSON answers from the commands phase 4 doesn't rework  ·  version 0.2.0
