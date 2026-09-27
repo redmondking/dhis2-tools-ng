@@ -211,6 +211,17 @@ An instance's address is `https://<hostname>/<path>`. The container name is sepa
 - Deleting the last instance on a subdomain asks whether to remove the subdomain's proxy config and certificate
   (`--remove-hostname yes|no`). The fqdn is never removed.
 - `dhis2-move-instance <name> -H <hostname> [-p <path>]` moves an instance to another hostname and/or path.
+- **`dhis2-hostname`** (agreed 2026-09-27), with the usual `-y`, `--dry-run`, `-h`:
+  - `add <hostname>`: DNS check (retry), short name, certificate email, certificate (section D), nginx config; root starts as the
+    (empty) list
+  - `list [<hostname>] [--json]`: short name, instances, what the root shows, certificate status and expiry, email
+  - `set-root <hostname>`: menu of the list page and that hostname's instances (number or path), summary, confirm;
+    `--list` / `--instance <name>` for automation; takes effect at once (nginx reload, 302 redirect)
+  - `set-munin <hostname>`: move the Munin pages
+  - `remove <hostname>`: refused while an instance uses it; removes its nginx config and settings, asks about its certificate;
+    never the default hostname
+  - `rebuild [<hostname>]`: regenerate nginx config from the saved settings, tested with `nginx -t`, rolled back on failure
+  - not included (for now): changing a hostname's short name or certificate email; renaming a hostname (add + move + remove)
 - Existing instances are labelled hostname = fqdn, path = container name. No renames.
 
 ## 8. Monitoring  [built]
