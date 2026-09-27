@@ -155,7 +155,7 @@ All state about an instance lives on its container:
 | `user.dhis2.munin` | `yes` / `no` | create-instance |
 | `user.dhis2.backup` | `plain` / `encrypted` / `no` | [planned, phase 6] create-instance |
 | `user.dhis2.postgres` | the postgres container holding its database | [planned, phase 6] create-instance |
-| `user.dhis2.hostname`, `user.dhis2.path` | [planned, phase 4] | create-instance, `dhis2-move-instance` |
+| `user.dhis2.hostname`, `user.dhis2.path` | [planned, phase 4] | `dhis2-instance create` / `edit` |
 | `user.dhis2.description` | shown on the hostname's list page, e.g. `Production` [planned, phase 4] | `dhis2-instance create` / `edit` |
 
 Instances made by older versions are labelled by `dhis2-upgrade-setup` (version from the deployed war's `dhis-api-*.jar`).
