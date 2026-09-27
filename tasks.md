@@ -216,7 +216,7 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
   Munin's hostname a setting; a certificate email per hostname (`architecture.md` section 7). Sections B–G still to discuss.
 
 - [ ] 4.1 nginx layout with one server block per hostname. Existing upstream files keep working under the fqdn
-- [ ] 4.2 Page at each hostname root that lists its instances, regenerated whenever instances change
+- [ ] 4.2 Each hostname's root: a list page of its instances (regenerated whenever instances change) or a redirect to a chosen instance (`architecture.md` section 7)
 - [ ] 4.3 DNS check for a new subdomain: on failure, explain what to check and offer to retry (without a terminal: exit 1)
 - [ ] 4.4 Certificate per subdomain, with the auto-renewal prompt (`dhis2-ssl-setup --hostname`, `--renew yes|no`)
 - [ ] 4.10 Certificate failure handling (agreed 2026-09-27, `architecture.md` section 4), as shared helpers used by every hostname:
@@ -230,9 +230,12 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [ ] 4.5 `dhis2-create-instance` prompts:
   1. hostname (existing or new subdomain)
   2. path, validated
-  3. container name [`<subdomain>-<path>`]
+  3. short name for a new hostname [its first part], asked once per hostname
+  4. container name [`<short name>-<path>`]
+  5. what the hostname's root shows (first instance: this instance or a list; later: keep, this instance, or a list)
 
-  Flags: `-H <hostname>`, `-p <path>` (both required with `-y`; name defaults to `<subdomain>-<path>`)
+  Flags: `-H <hostname>`, `-p <path>` (both required with `-y`), `--short-name`, `--name` (default `<short name>-<path>`),
+  `--root this|list|keep`, `--email` for a new hostname's certificate
 - [ ] 4.6 Quote instance names in all SQL, since names can contain `-`
 - [ ] 4.7 `dhis2-delete-instance` (`--remove-hostname yes|no` for automation): remove the instance from its hostname. If it was the last one there, offer to remove the subdomain (never the fqdn)
 - [ ] 4.8 `dhis2-move-instance <name> -H <hostname> [-p <path>]`: summary, `-y`, `--dry-run`
