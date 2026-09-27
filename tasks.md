@@ -14,10 +14,10 @@ tested on the test server and approved.
 |---|---|---|
 | **0.1.0** | 0, 2, 3, 3b; release files V.1; V.5; tested in phase 1 | written, untested; branch `release/0.1.0` |
 | **0.2.0** | 3c (JSON answers, live results, `dhis2-run`); V.2–V.4 (channels, versions shown, branches) | agreed, not built |
-| **0.3.0** | 4 (hostnames and paths, `dhis2-instance`, `dhis2-hostname`, certificate failure handling) | being discussed |
-| **0.4.0** | 5 (setup wizard, `--config`, admin login, memory) | agreed, not built |
+| **0.3.0** | 4 (hostnames and paths, `dhis2-instance`, `dhis2-hostname`, certificate failure handling, migrate into the new layout) on nginx | agreed, to plan |
+| **0.4.0** | 4a (phase 4 on apache); 5 (setup wizard, `--config`, admin login, memory) | agreed, not built |
 | **0.5.0** | 6 (backups, remotes, `dhis2-list-backups`) | agreed, not built |
-| **0.6.0** | 8 (bring existing servers forward) | agreed, not built |
+| **0.6.0** | 8 (bring existing servers forward: PostgreSQL, containers, `dhis2-server proxy --switch`) | agreed, not built |
 | **1.0.0** | release candidates of all the above; docs rewrite 10.1 | |
 | 1.1.0 | 7 (create an instance from a backup) | agreed, not built |
 | 1.2.0 | 9 (DHIS2 version upgrades) | to design |
@@ -31,7 +31,8 @@ tested on the test server and approved.
   (existing commands) and the automation notes in phases 4–9 (new commands).
 - 2026-09-26: the design moved from `CLAUDE.md` into `architecture.md`, restoring sections accidentally deleted in commit `356d186`.
 - Phase 3b is done (all `[~]`), including 3b.17 (certbot webroot for nginx, config test with rollback).
-- **Next step:** phase 4 (hostnames and paths): discuss (including several base domains per server), then plan in plan mode.
+- Phase 4 discussion (sections A–G) is done and recorded in `architecture.md`.
+- **Next step:** plan phase 4 in plan mode.
 - Testing (phase 1) waits until the scripts are written, as the user asked.
   Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
 - Until `0.1.0` is released, install on the test server from the release branch with
@@ -261,7 +262,9 @@ Rules: `architecture.md`, Command rules. Audit done 2026-09-26. New commands fol
 ## Phase 4 – Hostnames and paths  ·  version 0.3.0
 
 - Section A (domains) discussed 2026-09-27: any hostname whose DNS points here (no base domains); `fqdn` → `default_hostname`;
-  Munin's hostname a setting; a certificate email per hostname (`architecture.md`, Instances / Hostnames and certificates). Sections B–G still to discuss.
+  Munin's hostname a setting; a certificate email per hostname (`architecture.md`, Instances / Hostnames and certificates). Sections B–G
+  discussed 2026-09-27; G (existing servers): migrate leaves a server as if set up fresh, instances renamed on request; apache
+  and nginx both supported, apache one version behind (`architecture.md`, Install, update and migrate / Containers and packages).
 
 - [ ] 4.1 nginx layout with one server block per hostname. Existing upstream files keep working under the fqdn
 - [ ] 4.2 Each hostname's root: a list page of its instances (regenerated whenever instances change) or a redirect to a chosen instance (`architecture.md`, Instances / Hostnames and certificates)
@@ -299,10 +302,25 @@ Rules: `architecture.md`, Command rules. Audit done 2026-09-26. New commands fol
 - [ ] 4.13 Regroup all commands into six (`architecture.md`, Commands): `dhis2-instance` (+ `logs`), `dhis2-hostname` (+ `cert`,
       `certs`), `dhis2-backup` (`run`, `list`, `restore`, `remote …`), `dhis2-monitoring` (`glowroot`, `munin`), `dhis2-server`
       (`setup`, `update`, `migrate`, `db-activity`), `dhis2-run`; retire every old name on existing servers (with 4.12)
+- [ ] 4.14 `migrate` into the hostname layout (`architecture.md`, Install, update and migrate), replacing 8.1 and 8.2: `fqdn` →
+      `default_hostname` + short name, `munin_hostname`, `public_ip` (`--public-ip` required without a terminal), labels,
+      certificate → hostname setting, root question, proxy config rebuilt with the old one saved in `old-proxy/<date>/` and
+      unknown lines listed
+- [ ] 4.15 `migrate --rename-instances yes|no`: instances renamed one at a time to fresh-server names, with the move steps
+      (database renamed to match, shared or remote databases left and reported); things left with old names listed
+- [ ] 4.16 Per-hostname `extra.conf`: always included, created empty, never overwritten by `rebuild`
+- [ ] 4.17 On apache servers every phase 4 action refuses with exit 1, `not_on_apache`, until phase 4a
+
+## Phase 4a – Hostnames on apache  ·  version 0.4.0
+
+- [ ] 4a.1 Per-hostname apache layout (`/etc/apache2/sites/<hostname>.conf`, `upstream/<hostname>/<path>.conf`, `extra.conf`),
+      built from the same settings, `apache2ctl -t` with rollback
+- [ ] 4a.2 Certificates on apache: webroot instead of standalone, config test with rollback, failure handling (4.10)
+- [ ] 4a.3 `migrate` steps 4.14 and 4.15 on apache servers; lift the 4.17 refusals
 
 ## Phase 5 – Interactive setup and instance creation  ·  version 0.4.0
 
-- [ ] 5.1 Setup wizard `setup.sh`: asks FQDN, email, TZ, monitoring, Glowroot defaults and login mode, backups, then writes `containers.json`
+- [ ] 5.1 Setup wizard `setup.sh`: asks the proxy (nginx [default] or apache), FQDN, email, TZ, monitoring, Glowroot defaults and login mode, backups, then writes `containers.json`
 - [ ] 5.1b `setup.sh --dry-run`: check the config and print what would be set up
 - [ ] 5.1a `setup.sh --config <file|->`: the same install with no prompts, for Ansible and the Nuxt app.
       Secrets are accepted in the input and stripped before saving. Update `containers.json.sample` to the full format
@@ -422,8 +440,8 @@ Testing: connect ✓  write ✓  delete test file ✓
 
 ## Phase 8 – Bring existing servers forward (`upgrade_setup.sh`)  ·  version 0.6.0
 
-- [ ] 8.1 Label existing instances with `hostname` = fqdn and `path` = container name (version/tomcat/java moved to 3.8)
-- [ ] 8.2 Move proxy config to the per-hostname layout
+- [ ] 8.1 (moved to 4.14)
+- [ ] 8.2 (moved to 4.14)
 - [ ] 8.3 (moved to 3.9)
 - [ ] 8.4 Optional PostgreSQL 13 → 16 upgrade, with a checked backup first
 - [ ] 8.5 Keep existing `dhis2-env` backup settings, only adding new keys (`MONTHS_TO_KEEP`)
@@ -438,8 +456,8 @@ Testing: connect ✓  write ✓  delete test file ✓
       Tell the user the remote copy will receive the new layout, and that the old remote folders are left for them to remove.
 - [ ] 8.7 Turn an old `REMOTE=` setting in `dhis2-env` into remote `remote1`, SSH type, mode `keep` (same behaviour as before)
 
-- [ ] 8.8 On apache servers, offer to switch to nginx (rework `change_webserver.sh`: hardcoded 192.168.0.3 and network, per-hostname layout).
-      Delete apache support (`containers/apache_proxy*`, `configs/apache-dhis2.conf`, apache branches) once that switch is tested
+- [ ] 8.8 `dhis2-server proxy --switch nginx|apache` (`architecture.md`, Containers and packages), replacing `change_webserver.sh`
+      (hardcoded 192.168.0.3 and network, no certificates or instances carried over)
 
 ## Phase 9 – DHIS2 version upgrade script (last)  ·  version 1.2.0
 

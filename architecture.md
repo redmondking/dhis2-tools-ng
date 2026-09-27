@@ -9,7 +9,7 @@ Bash tools that run DHIS2 on one Ubuntu server, each part in its own LXD contain
 
 ```
 Ubuntu 24.04 host (LXD, ufw; ports 80/443 forwarded to the proxy)
-├── proxy       nginx + certbot: https per hostname, routes /<path> to instances
+├── proxy       nginx or apache + certbot: https per hostname, routes /<path> to instances
 ├── postgres    PostgreSQL 16 + PostGIS, one database per instance
 ├── monitor     Munin (optional): graphs for the host and every container
 └── <instance>  one per DHIS2 instance: Tomcat 9 or 10, DHIS2, optional Glowroot agent
@@ -28,7 +28,7 @@ Each is `<command> <action> [options]`; each action lives in its own file (e.g. 
 | `dhis2-hostname` | `add`, `list`, `set-root`, `set-munin`, `remove`, `rebuild`, `cert` (get / retry / replace a certificate), `certs` (expiry and last renewal of all) |
 | `dhis2-backup` | `run` (the nightly job), `list`, `restore`, `remote add\|list\|test\|sync\|remove` |
 | `dhis2-monitoring` | `glowroot [instance]` (set a Glowroot login), `munin` (set the Munin login) |
-| `dhis2-server` | `setup` (wizard), `update` (new tools), `migrate` (bring this server's setup up to the installed tools), `db-activity`; `repair` is kept free for real repairs later |
+| `dhis2-server` | `setup` (wizard), `update` (new tools), `migrate` (bring this server's setup up to the installed tools), `db-activity`, `proxy --switch nginx\|apache` `[0.6.0]`; `repair` is kept free for real repairs later |
 | `dhis2-run` | `follow`, `status`, `list` (background runs) `[0.2.0]` |
 
 - `install.sh` stays separate: the one-line bootstrap before any command exists.
@@ -71,7 +71,7 @@ Each is `<command> <action> [options]`; each action lives in its own file (e.g. 
   `{"ok": false, "command": …, "error": {"code": …, "message": …}}`. `--dry-run --json` gives the summary with
   `"dry_run": true`. Every answer and every run log includes the tools version. `[0.2.0]` (commands reworked in `[0.3.0]` get it there)
 - Error codes: `missing_input` (with `"missing": [flags]`), `refused`, `not_found`, `already_exists`, `checksum_mismatch`,
-  `dns_not_pointing_here`, `rate_limited`, `config_test_failed`, `failed`.
+  `dns_not_pointing_here`, `rate_limited`, `config_test_failed`, `not_on_apache`, `failed`.
 - Live results `[0.2.0]`:
   - `--json-stream`: JSON Lines while running (`start` with the run id, `step`, `progress`); the last line is the `--json` answer.
   - Every run is logged to `/var/log/dhis2-tools/runs/<run-id>.jsonl`.
@@ -122,23 +122,47 @@ safe to run twice. The shared helpers are in `setup/lib/dhis2-lib.sh`.
 - Wizard `[0.4.0]`: plain bash prompts (`whiptail` later); `--config <file|->` does the same with no prompts, in the format the
   wizard writes (`configs/containers.json.sample`, kept complete and in sync with the wizard); secrets may be in it and are
   stripped before `containers.json` is saved.
-  Automation writes the JSON to a root-only file, runs `--config` on it, then deletes it. Asks `default_hostname`, email,
-  `public_ip`, TZ, Munin, Glowroot, backup settings.
+  Automation writes the JSON to a root-only file, runs `--config` on it, then deletes it. Asks the proxy (nginx [default] or
+  apache), `default_hostname`, email, `public_ip`, TZ, Munin, Glowroot, backup settings.
 
 **Migrate** (`dhis2-server migrate`)
 - Brings a server set up with older tools (including the original scripts, on 20.04, 22.04 or 24.04 hosts) up to the installed
-  tools. **Every change to installed state or to an `etc/*` template ships with a step here**, patching only known lines.
+  tools. **Afterwards the server is as if it had been set up fresh with these tools**: the same names, labels, settings and
+  proxy layout. **Every change to installed state or to an `etc/*` template ships with a step here**, patching only known lines.
 - Safe to re-run; `--dry-run` reports every change. Without a terminal it behaves as `-y`; password steps use
   `--secrets-stdin` or are skipped with a warning. Flags for its questions: `--renew`, `--glowroot-login`, `--glowroot-user`,
-  `--munin-user`, `--restart` (Tomcat restarts are collected and done only with `--restart yes` or a yes at the end).
+  `--munin-user`, `--restart` (Tomcat restarts are collected and done only with `--restart yes` or a yes at the end),
+  `--public-ip`, `--short-name`, `--root`, `--rename-instances`.
+- Into the hostname layout `[0.3.0; apache 0.4.0]`:
+  - `fqdn` becomes `default_hostname`, with a short name (asked, default its first part); `munin_hostname` = `default_hostname`.
+  - `public_ip` is asked, the outside lookup suggested. Without a terminal `--public-ip` is required until it is set (exit 3).
+  - Instances are labelled hostname = `default_hostname`, path = their old name, so their addresses don't change.
+  - The certificate becomes the default hostname's setting: certbot's → `letsencrypt` (the server's email), other files →
+    `own`, none → `none` with a warning pointing to `dhis2-hostname cert`.
+  - The root is asked as on create (`--root list|<instance>`; default the instance if there is one, else the list). The old
+    default page, or an admin's own page in `/var/www/html`, is not kept.
+  - The proxy config is rebuilt from the settings. The old config is saved in `/usr/local/etc/dhis/old-proxy/<date>/`, and the
+    lines the tools didn't write are listed, to be moved into the hostname's `extra.conf` (section 8).
+- Renaming instances `[0.3.0; apache 0.4.0]` to the names a fresh server gives them (section 7): DHIS2 is down a few minutes
+  per instance, so it is its own question (`--rename-instances yes|no`). An unattended migrate without it skips the step, lists
+  the instances and prints `sudo dhis2-server migrate --rename-instances yes`.
+  - One instance at a time, named as on create (asked, default `<short name>-<old name>`; `-y` takes the default), with the
+    steps of a move (section 7). Its database (from `dhis.conf`) gets the new name whatever it was called; one shared with
+    another instance, or on another server, is left and reported.
+  - Listed at the end, not changed: Munin's graph history (starts again under the new name), the admin's own cron jobs or
+    scripts using old names, remote backup folders (new backups go under the new name).
 
 ## 5. Containers and packages
 
 - The proxy, postgres and monitor containers run Ubuntu 24.04; instance containers depend on the DHIS2 version (section 6).
 - Only Ubuntu's own packages, no third-party repositories or snaps: `postgresql-16` + `postgresql-16-postgis-3`, `nginx` 1.24
-  (so `listen 443 ssl http2;`, not `http2 on;`), `certbot` (apt). No OCSP stapling.
-- **nginx is the only proxy.** Older servers with apache keep working until `dhis2-server migrate` moves them to nginx `[0.6.0]`;
-  apache support is then deleted.
+  (so `listen 443 ssl http2;`, not `http2 on;`), `apache2` 2.4, `certbot` (apt). No OCSP stapling.
+- **Two proxies, nginx (default) and apache**, chosen in the wizard (`proxy` in `containers.json`) and supported equally, apache
+  lagging: each feature is built for nginx first and for apache in the next version (`[0.3.0; apache 0.4.0]`). Until then the
+  command refuses on apache (exit 1, `not_on_apache`).
+- `dhis2-server proxy --switch nginx|apache` `[0.6.0]`: builds the new proxy container next to the old one, copies the
+  certificates, builds its config from the settings and tests it, then swaps (seconds of downtime). The old container is kept
+  stopped for rollback until the admin removes it.
 - One shared PostgreSQL 16 container. DHIS2 2.38 on 16 is on the test list; if it fails, a second postgres container on 14.
 - Existing servers keep their containers (20.04, PostgreSQL 13) until `migrate` moves them to 24.04 and PostgreSQL 16 in one
   optional step, with a checked backup first `[0.6.0]`.
@@ -233,15 +257,14 @@ through the API once DHIS2 is up. Keeping the defaults prints a warning. Skipped
 
 ## 8. Hostnames and certificates
 
-**Hostnames** `[0.3.0]`
+**Hostnames** `[0.3.0; apache 0.4.0]` (every `[0.3.0]` part of this section reaches apache in `[0.4.0]`)
 - Any hostname is allowed if its DNS points at `public_ip`; hostnames are stored in lowercase.
 - `default_hostname` in `containers.json` (was `fqdn`; `migrate` renames it, and the scripts read `fqdn` until then): offered
   first for new instances. Any full hostname, including a subdomain.
 - An instance's address is `https://<hostname>/<path>`. Paths: lowercase letters, digits and `-`, 1–40 characters, not starting
   or ending with `-`; unique per hostname; never `/` itself. Reserved: `/munin` on Munin's hostname, `/<path>-glowroot` of each
   instance. Tomcat serves DHIS2 at the same path (`webapps/<path>`), so the proxy never rewrites paths.
-- Existing instances: `migrate` labels them hostname = `default_hostname`, path = their name, and gives `default_hostname` a
-  short name (its first part). Nothing is renamed.
+- Existing servers are brought into this layout by `migrate` (section 4).
 - Each hostname has a **short name** (asked when the hostname is created, default its first part, unique on the server).
 - **The root** (`https://<hostname>/`) shows a list page or redirects (302) to one of its instances:
   - asked when an instance is created on it (first instance: "this instance or a list", default this; later: "keep, this
@@ -251,9 +274,11 @@ through the API once DHIS2 is up. Keeping the defaults prints a warning. Skipped
   - menus list only that hostname's instances and accept the number or the path
 - **The list page**: the hostname as title, a link per instance with its description (HTML-escaped); no versions or other details.
 - **Settings and proxy config**: `/usr/local/etc/dhis/hostnames/<hostname>.json` (short name, certificate choice, email and
-  account, root, redirects). The nginx config is always built from these settings plus the instance labels, then tested
-  (`nginx -t`) and reloaded; a failed test puts the old config back. Files in the proxy: `/etc/nginx/sites/<hostname>.conf`,
-  `/etc/nginx/upstream/<hostname>/<path>.conf`, `/var/www/hostnames/<hostname>/index.html`.
+  account, root, redirects). The proxy config is always built from these settings plus the instance labels, then tested
+  (`nginx -t` / `apache2ctl -t`) and reloaded; a failed test puts the old config back. Files in the proxy (apache: the same
+  under `/etc/apache2`): `/etc/nginx/sites/<hostname>.conf`, `/etc/nginx/upstream/<hostname>/<path>.conf`,
+  `/var/www/hostnames/<hostname>/index.html`, and `/etc/nginx/sites/<hostname>.extra.conf` for the admin's own lines: always
+  included, created empty, never overwritten.
 - **Adding** (`dhis2-hostname add`, or "a new hostname" in `dhis2-instance create`): valid and new → short name → certificate
   email [the server's] → DNS check against `public_ip` (on failure: what it points at and what to create; retry, `--wait-dns`,
   or cancel; exit 1 without a terminal) → certificate → settings, nginx config, reload → report. Before its certificate a
@@ -291,7 +316,8 @@ through the API once DHIS2 is up. Keeping the defaults prints a warning. Skipped
   4. `dhis2-hostname certs` (`--json`): expiry, last renewal attempt and result per certificate, warning under 14 days; the
      warning also shows in `dhis2-instance list`.
   5. `--json`: success, the failed stage (dns, ipv6, caa, proxy, letsencrypt, config-test), the reason, the retry time.
-- Apache servers keep standalone certbot with stop/start hooks until migrated to nginx.
+- apache gets the same webroot design, with `apache2ctl -t` and the failure handling `[apache 0.4.0]`; until then standalone
+  certbot with stop/start hooks.
 
 ## 9. Monitoring
 
