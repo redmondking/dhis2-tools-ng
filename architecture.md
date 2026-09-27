@@ -159,7 +159,8 @@ safe to run twice. The shared helpers are in `setup/lib/dhis2-lib.sh`.
   (so `listen 443 ssl http2;`, not `http2 on;`), `apache2` 2.4, `certbot` (apt). No OCSP stapling.
 - **Two proxies, nginx (default) and apache**, chosen in the wizard (`proxy` in `containers.json`) and supported equally, apache
   lagging: each feature is built for nginx first and for apache in the next version (`[0.3.0; apache 0.4.0]`). Until then the
-  command refuses on apache (exit 1, `not_on_apache`).
+  command refuses on apache (exit 1, `not_on_apache`). In `0.3.0`, `dhis2-instance create/delete/deploy/list/logs` keep the old
+  way on apache (an instance at `/<name>` on the fqdn); `dhis2-hostname`, `edit` and migrate's hostname steps refuse.
 - `dhis2-server proxy --switch nginx|apache` `[0.6.0]`: builds the new proxy container next to the old one, copies the
   certificates, builds its config from the settings and tests it, then swaps (seconds of downtime). The old container is kept
   stopped for rollback until the admin removes it.

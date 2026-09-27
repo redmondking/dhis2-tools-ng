@@ -31,8 +31,9 @@ tested on the test server and approved.
   (existing commands) and the automation notes in phases 4–9 (new commands).
 - 2026-09-26: the design moved from `CLAUDE.md` into `architecture.md`, restoring sections accidentally deleted in commit `356d186`.
 - Phase 3b is done (all `[~]`), including 3b.17 (certbot webroot for nginx, config test with rollback).
-- Phase 4 discussion (sections A–G) is done and recorded in `architecture.md`.
-- **Next step:** plan phase 4 in plan mode.
+- Phase 4 discussion (sections A–G) is done and recorded in `architecture.md`; its plan is approved (build order in phase 4).
+  It is built on `release/0.3.0`, after `0.1.0` is released and `0.2.0` (3c) is built.
+- **Next step:** `0.1.0`: V.1 (release files), V.5, then testing (phase 1).
 - Testing (phase 1) waits until the scripts are written, as the user asked.
   Needed then: test server IP, SSH access for Claude, and a test domain with wildcard DNS.
 - Until `0.1.0` is released, install on the test server from the release branch with
@@ -266,6 +267,22 @@ Rules: `architecture.md`, Command rules. Audit done 2026-09-26. New commands fol
   discussed 2026-09-27; G (existing servers): migrate leaves a server as if set up fresh, instances renamed on request; apache
   and nginx both supported, apache one version behind (`architecture.md`, Install, update and migrate / Containers and packages).
 
+- **Build order** (plan approved 2026-09-27; uses 3c's JSON helpers):
+  1. 4.13, 4.11, 4.12: one dispatcher `setup/dispatch` (the six links point to it; a table maps actions to scripts) and the
+     actions in `setup/<command>/<action>`; `lxd_setup.sh`, `install.sh`, `upgrade_setup.sh` stay where they are (older
+     installers run `upgrade_setup.sh`); `dhis2-tomcat-munin` → internal `instance/munin-node`
+  2. 4.6, 4.6a: lib helpers: `conf_get` (falls back to `fqdn`), `hostname_get`/`hostname_set` (`hostnames/<h>.json`),
+     `instances_json` (one `lxc list --format json`), validators, `instance_name` (61 max), `free_ip`, quoted SQL
+  3. 4.1, 4.2, 4.16: `proxy_build`: the whole proxy tree built locally from settings + labels, pushed, `nginx -t`, old tree
+     back on failure; `nginx-dhis2.conf` includes `sites/*.conf`; `hostname rebuild|list|set-root|set-munin|remove`
+  4. 4.3, 4.3a, 4.4, 4.10: `hostname add|cert|certs` (`dig` from `bind9-dnsutils`; proxy check by a token file fetched over
+     http; staging run first; `certbot register` per email; attempts in the hostname settings)
+  5. 4.5, 4.9: `instance create`; Tomcat context and Glowroot `contextPath` = the path (`deploy_war` reads `user.dhis2.path`)
+  6. 4.7, 4.8: `instance delete`; `instance edit` with the lib's `instance_rename` (checks first; an undo stack run backwards on failure)
+  7. 4.14, 4.15: migrate steps 11 settings, 12 labels, 13 root, 14 proxy layout (old config saved, hand-written lines found by
+     line-set difference against the old templates), 15 rename
+  8. 4.17: apache keeps the old way in `create/delete/deploy/list/logs` (`apache_add_instance`/`apache_remove_instance`); the rest refuses
+  9. docs: `[0.3.0]` marks removed, old-name map dropped, `CHANGELOG.md`, README, 1.3 test list
 - [ ] 4.1 nginx layout with one server block per hostname. Existing upstream files keep working under the fqdn
 - [ ] 4.2 Each hostname's root: a list page of its instances (regenerated whenever instances change) or a redirect to a chosen instance (`architecture.md`, Instances / Hostnames and certificates)
 - [ ] 4.3 DNS check for a new hostname against `public_ip` (new setting, suggested by the wizard from an outside lookup): on failure,
