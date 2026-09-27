@@ -210,6 +210,14 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 - [~] 3b.15 `--password-stdin` → `--secrets-stdin` in `dhis2-create-instance`, `dhis2-glowroot-login`, `dhis2-munin-login`;
       `-U` → `--glowroot-user` / `--munin-user` (keep `-U` as a short form)
 
+## Phase 3c – JSON answers from the commands phase 4 doesn't rework
+
+- [ ] 3c.1 `--json` answers (`architecture.md` section 12) in the shared helpers: `die` / `check_missing` / `confirm_summary`
+      produce the error and dry-run objects; a `json_result` helper for success
+- [ ] 3c.2 `--json` on `dhis2-deploy-war`, `dhis2-restoredb`, `dhis2-glowroot-login`, `dhis2-munin-login`, `dhis2-upgrade-setup`,
+      `dhis2-backup`, `dhis2-dbactivity`/`dhis2-logview` (already JSON: check they fit), `dhis2-tools-update`
+- Phase 4 adds `--json` to the commands it reworks (create/delete/move instance, `dhis2-hostname`, `dhis2-ssl-setup`)
+
 ## Phase 4 – Hostnames and paths
 
 - Section A (domains) discussed 2026-09-27: any hostname whose DNS points here (no base domains); `fqdn` → `default_hostname`;

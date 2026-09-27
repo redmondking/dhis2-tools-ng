@@ -349,7 +349,17 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
   plus typing the instance name on a terminal, or `--force -y` without one.
 
 **Output**
-- `--json` on every list/status command. Missing values are `null`. With `--json`, stdout is pure JSON; everything else goes to stderr.
+- `--json` on **every** command (agreed 2026-09-27). With `--json`, stdout is one JSON object and nothing else; progress and
+  prompts go to stderr. List/status commands keep their current JSON; commands that do something answer:
+  - success: `{"ok": true, "command": "<name>", "result": {…command-specific…}}` (e.g. create-instance: name, hostname, path,
+    url, ip, release, tomcat, java, glowroot, munin)
+  - failure: `{"ok": false, "command": "<name>", "error": {"code": "<code>", "message": "…", …}}`, e.g. `"missing": [flags]` for
+    `missing_input`. Stable codes the caller can switch on: `missing_input` (exit 3), `refused`, `not_found`, `already_exists`,
+    `checksum_mismatch`, `dns_not_pointing_here`, `rate_limited`, `config_test_failed`, `failed`. Exit codes are unchanged.
+  - `--dry-run --json`: the summary as data, with `"dry_run": true` and whether it would be refused.
+  - Built into the shared helpers (`die`, `check_missing`, `summary`, `confirm_summary`); each command adds its `result`.
+  - When: commands reworked in phase 4 get it there; the rest in a short phase 3c (deploy-war, restoredb, the login commands,
+    upgrade-setup, backup).
 - Errors go to stderr through `die` (`setup/lib/dhis2-lib.sh`).
 - `-h`/`--help` lists every flag with its default, and exits 0.
 
@@ -403,6 +413,8 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   and deploy-war, the security fixes (logview, ssl-setup), then the rest, one commit per command.
 - 2026-09-27: nginx only re-confirmed (the user asked whether forcing nginx is a problem for organisations using apache; the proxy
   is a container these tools manage, and supporting both would double every proxy feature).
+- 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
+  phase 3c for the rest.
 - 2026-09-27 (phase 4 B): paths `[a-z0-9-]`, 1–40 characters; each hostname's root is a list page or a redirect to a chosen
   instance, asked when an instance is created on it; container names = a short name per hostname (default its first part) +
   the path. Corrected the same day: the short name is asked when the hostname is created, not at its first instance.
