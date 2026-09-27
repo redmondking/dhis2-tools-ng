@@ -214,7 +214,9 @@ Rules: `architecture.md` section 12, "Command and flag rules". Audit done 2026-0
 
 - [ ] V.1 `VERSION` at the repo root, `CHANGELOG.md` (with the work so far under "Unreleased", grouped Added / Changed / Fixed /
       Security / Upgrade notes), `RELEASING.md`, `tools/release.sh`
-- [ ] V.2 What servers install and how versions are shown: discussion R3–R5 still open
+- [ ] V.2 `install.sh` / `dhis2-tools-update`: channels `stable` (default) / `rc` / `develop` (remembered per server, `--channel`),
+      `--version <x.y.z>` (older refused unless `--force`), `--allow-major` for major updates even with `-y`
+- [ ] V.3 How versions are shown: discussion R4–R5 still open
 - Milestones: phases 0–3b tested → `0.1.0`; 3c → `0.2.0`; 4 → `0.3.0`; … `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`
 
 ## Phase 3c – JSON answers from the commands phase 4 doesn't rework
@@ -435,6 +437,7 @@ Testing: connect ✓  write ✓  delete test file ✓
 - [ ] Turn Glowroot or Munin on or off for an existing instance (e.g. `dhis2-glowroot enable <instance>`): `-y` (restart), `--dry-run`
 - [ ] Alerts when a remote backup fails (6.12)
 - [ ] `setup.sh --answers` replay of a previous wizard run
+- [ ] Automatic updates of the tools (e.g. a timer running `dhis2-tools-update` on a chosen channel), off by default
 
 ## Decisions
 

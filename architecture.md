@@ -434,6 +434,15 @@ Agreed 2026-09-26. Existing commands are brought in line in phase 3b; new comman
   - **`1.0.0` contains phases 0–6 and 8**: everything a new or an existing server needs day to day. Then `1.0.0-rc.N` on the test
     server, then `1.0.0`.
   - After `1.0.0`: phase 7 (create from a backup), phase 9 (DHIS2 upgrades) and phase 10 (docs, whiptail) as `1.x` releases.
+- **What servers install** (agreed, R3). This replaces "updates follow `master`" (section 3):
+  - Channels, chosen per server and remembered: `stable` (default: the newest release), `rc` (the newest release or release
+    candidate: the test server, early testers), `develop` (the newest commit on `develop`: development only; replaces the
+    `DHIS2_TOOLS_BRANCH` testing override). `install.sh --channel <name>`; `dhis2-tools-update --channel <name>` switches it.
+  - `dhis2-tools-update --version <x.y.z>` installs exactly that release. An older version than the installed one is refused
+    unless `--force` (with a warning: `dhis2-upgrade-setup` only migrates forward). `--rollback` stays for emergencies.
+  - A major update (e.g. `1.x` → `2.0.0`) is never silent: even with `-y` it needs `--allow-major`, otherwise it stops and
+    shows what's new. Minor and patch updates go ahead as normal.
+  - No automatic updates for now: a server updates only when someone runs `dhis2-tools-update` (automatic updates: later).
 
 ## 13. Management app and automation
 
@@ -482,6 +491,7 @@ collected and done only with `--restart yes` or a yes at the end (default no).
   is a container these tools manage, and supporting both would double every proxy feature).
 - 2026-09-27: `--json` on every command (ok/result or ok/error with stable error codes); phase 4 for the commands it reworks,
   phase 3c for the rest.
+- 2026-09-27: channels stable / rc / develop; `--version`; `--allow-major` for major updates; no automatic updates yet.
 - 2026-09-27: `0.x` milestones before `1.0.0` (phases 0–3b = `0.1.0` once tested); `1.0.0` = phases 0–6 and 8; 7, 9, 10 in `1.x`.
 - 2026-09-27: releases: changelog kept up as work happens; tag + GitHub Release; `tools/release.sh` prepares locally, the user
   pushes; `RELEASING.md`.
